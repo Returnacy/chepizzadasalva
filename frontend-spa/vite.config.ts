@@ -21,7 +21,7 @@ export default defineConfig({
   server: {
     proxy: {
       "/api": {
-        target: "https://api.fidelity.chepizzadasalva.it",
+        target: "https://fidelity.business.chepizzadasalva.it",
         changeOrigin: true,
         secure: false,
       },
