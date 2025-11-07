@@ -21,9 +21,12 @@ ARG GITHUB_PACKAGES_TOKEN
 ENV CI=true \
     GITHUB_PACKAGES_TOKEN=${GITHUB_PACKAGES_TOKEN}
 
-RUN apt-get update && apt-get install -y --no-install-recommends openssl ca-certificates && rm -rf /var/lib/apt/lists/* && \
-    corepack enable && \
-	(pnpm install --frozen-lockfile || pnpm install --no-frozen-lockfile)
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends openssl ca-certificates \
+    && rm -rf /var/lib/apt/lists/* \
+    && corepack enable \
+    && npm install -g patch-package \
+    && (pnpm install --frozen-lockfile || pnpm install --no-frozen-lockfile)
 
 RUN pnpm --filter @business-service/db exec prisma generate || true
 RUN pnpm --filter @business-service/db build && \
