@@ -55,42 +55,76 @@ export function registerStampsRoutes(app: FastifyInstance) {
       .filter((p: any) => p.pointsRequired > 0)
       .sort((a: any, b: any) => a.pointsRequired - b.pointsRequired);
 
-    const nonPromotionalCoupons = coupons.filter((c: any) => c.prize && c.prize.isPromotional === false);
-    const totalAwardedPoints = nonPromotionalCoupons.reduce((sum: number, coupon: any) => {
-      const points = Number(coupon.prize?.pointsRequired ?? 0);
-      return Number.isFinite(points) ? sum + points : sum;
-    }, 0);
-
-    const lastNonPromotionalCoupon = nonPromotionalCoupons.reduce((latest: any | null, current: any) => {
-      if (!current) return latest;
-      if (!latest) return current;
-      const latestTs = latest.createdAt instanceof Date ? latest.createdAt.getTime() : new Date(latest.createdAt ?? 0).getTime();
-      const currentTs = current.createdAt instanceof Date ? current.createdAt.getTime() : new Date(current.createdAt ?? 0).getTime();
-      return currentTs > latestTs ? current : latest;
-    }, null);
-
-    let targetPrize: any | null = null;
-    if (nonPromotionalPrizes.length > 0) {
-      if (!lastNonPromotionalCoupon || !lastNonPromotionalCoupon.prize) {
-        targetPrize = nonPromotionalPrizes[0];
-      } else {
-        const lastIndex = nonPromotionalPrizes.findIndex((p: any) => p.id === lastNonPromotionalCoupon.prize.id);
-        const nextIndex = lastIndex >= 0 ? (lastIndex + 1) % nonPromotionalPrizes.length : 0;
-        targetPrize = nonPromotionalPrizes[nextIndex];
-      }
-    }
+    const nonPromotionalCoupons = coupons
+      .filter((c: any) => c.prize && c.prize.isPromotional === false)
+      .slice()
+      .sort((a: any, b: any) => {
+        const aTs = a.createdAt instanceof Date ? a.createdAt.getTime() : new Date(a.createdAt ?? 0).getTime();
+        const bTs = b.createdAt instanceof Date ? b.createdAt.getTime() : new Date(b.createdAt ?? 0).getTime();
+        return aTs - bTs;
+      });
 
     let createdCoupon: any = null;
-    let stampsUsedForCoupon = 0;
-    if (targetPrize) {
-      const required = Number(targetPrize.pointsRequired ?? 0);
-      const availableStamps = Math.max(0, validStamps - totalAwardedPoints);
-      if (required > 0 && availableStamps >= required) {
+    let consumedStampsAfter = 0;
+
+    if (nonPromotionalPrizes.length > 0) {
+      const thresholds = nonPromotionalPrizes.map((p: any) => p.pointsRequired);
+      const maxThreshold = thresholds[thresholds.length - 1];
+
+      let currentCycle = 0;
+      let lastStageIndex = -1;
+      let absLastThreshold = 0;
+
+      for (const coupon of nonPromotionalCoupons) {
+        const stageIndex = thresholds.findIndex((value: number) => value === Number(coupon.prize?.pointsRequired ?? 0));
+        if (stageIndex === -1) continue;
+        if (lastStageIndex !== -1 && stageIndex <= lastStageIndex) {
+          currentCycle += 1;
+        }
+        absLastThreshold = currentCycle * maxThreshold + thresholds[stageIndex];
+        lastStageIndex = stageIndex;
+      }
+
+      const consumedStampsBefore = absLastThreshold;
+      consumedStampsAfter = consumedStampsBefore;
+
+      const nextStageIndex = lastStageIndex === -1 ? 0 : (lastStageIndex + 1) % thresholds.length;
+      let cycleForNextStage = currentCycle;
+      if (lastStageIndex !== -1 && nextStageIndex <= lastStageIndex) {
+        cycleForNextStage += 1;
+      }
+
+      const targetPrize = nonPromotionalPrizes[nextStageIndex] ?? null;
+      const absNextThreshold = targetPrize ? cycleForNextStage * maxThreshold + targetPrize.pointsRequired : 0;
+      const stampsToConsume = targetPrize ? absNextThreshold - consumedStampsBefore : 0;
+
+      if (targetPrize && stampsToConsume > 0 && validStamps >= absNextThreshold) {
         const code = crypto.randomUUID();
         createdCoupon = await app.repository.createCoupon(input.userId, input.businessId, targetPrize.id, code);
         coupons.push(createdCoupon);
-        stampsUsedForCoupon = Math.min(required, validStamps);
+        consumedStampsAfter = absNextThreshold;
       }
+    } else {
+      const numericThresholds = prizes
+        .map((p: any) => Number(p.pointsRequired) || 0)
+        .filter((value: number) => value > 0);
+      const baseRequired = numericThresholds.length > 0 ? Math.min(...numericThresholds) : 15;
+      const totalCoupons = coupons.length;
+      const entitledCoupons = Math.floor(validStamps / baseRequired);
+      const consumedBefore = Math.min(validStamps, totalCoupons * baseRequired);
+      let consumedAfter = consumedBefore;
+
+      if (entitledCoupons > totalCoupons) {
+        const prize = prizes.find((p: any) => Number(p.pointsRequired) === baseRequired) || prizes[0] || null;
+        if (prize) {
+          const code = crypto.randomUUID();
+          createdCoupon = await app.repository.createCoupon(input.userId, input.businessId, prize.id, code);
+          coupons.push(createdCoupon);
+          consumedAfter = Math.min(validStamps, (totalCoupons + 1) * baseRequired);
+        }
+      }
+
+      consumedStampsAfter = consumedAfter;
     }
 
     // 3) Sync counters to user-service via internal service-auth endpoint
@@ -103,8 +137,7 @@ export function registerStampsRoutes(app: FastifyInstance) {
 
     const now = new Date();
     const unredeemedCount = coupons.filter((c: any) => !c.isRedeemed && (!c.expiredAt || new Date(c.expiredAt).getTime() > now.getTime())).length;
-  const totalAwardedPointsAfter = totalAwardedPoints + stampsUsedForCoupon;
-  const adjustedValidStamps = Math.max(0, validStamps - totalAwardedPointsAfter);
+    const adjustedValidStamps = Math.max(0, validStamps - consumedStampsAfter);
 
     await userClient.updateMembershipCounters({
       userId: input.userId,
