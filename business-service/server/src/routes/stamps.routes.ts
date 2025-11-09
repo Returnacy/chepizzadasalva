@@ -44,24 +44,50 @@ export function registerStampsRoutes(app: FastifyInstance) {
       await app.repository.addStamp(input.userId, input.businessId);
     }
 
-    // 2) Compute valid stamps and determine if coupon(s) should be created based on entitlements
+    // 2) Compute valid stamps and evaluate next non-promotional prize entitlement
     const validStamps = await app.repository.countValidStamps(input.userId, input.businessId);
     const prizes = await app.repository.listPrizes({ businessId: input.businessId });
-    const baseRequired = prizes.length > 0 ? Math.min(...prizes.map((p: any) => Number(p.pointsRequired) || 15)) : 15;
+    const coupons = await app.repository.listCoupons(input.userId, input.businessId);
 
-    // Total coupons ever created for this user/business (redeemed or not)
-    const existingAll = await app.repository.listCoupons(input.userId, input.businessId);
-    const entitled = Math.floor(validStamps / baseRequired);
-    const toCreate = Math.max(0, entitled - existingAll.length);
+    const nonPromotionalPrizes = prizes
+      .filter((p: any) => !p.isPromotional)
+      .map((p: any) => ({ ...p, pointsRequired: Number(p.pointsRequired) || 0 }))
+      .filter((p: any) => p.pointsRequired > 0)
+      .sort((a: any, b: any) => a.pointsRequired - b.pointsRequired);
 
-    const prize = prizes.find((p: any) => Number(p.pointsRequired) === baseRequired) || prizes[0] || null;
+    const nonPromotionalCoupons = coupons.filter((c: any) => c.prize && c.prize.isPromotional === false);
+    const totalAwardedPoints = nonPromotionalCoupons.reduce((sum: number, coupon: any) => {
+      const points = Number(coupon.prize?.pointsRequired ?? 0);
+      return Number.isFinite(points) ? sum + points : sum;
+    }, 0);
+
+    const lastNonPromotionalCoupon = nonPromotionalCoupons.reduce((latest: any | null, current: any) => {
+      if (!current) return latest;
+      if (!latest) return current;
+      const latestTs = latest.createdAt instanceof Date ? latest.createdAt.getTime() : new Date(latest.createdAt ?? 0).getTime();
+      const currentTs = current.createdAt instanceof Date ? current.createdAt.getTime() : new Date(current.createdAt ?? 0).getTime();
+      return currentTs > latestTs ? current : latest;
+    }, null);
+
+    let targetPrize: any | null = null;
+    if (nonPromotionalPrizes.length > 0) {
+      if (!lastNonPromotionalCoupon || !lastNonPromotionalCoupon.prize) {
+        targetPrize = nonPromotionalPrizes[0];
+      } else {
+        const lastIndex = nonPromotionalPrizes.findIndex((p: any) => p.id === lastNonPromotionalCoupon.prize.id);
+        const nextIndex = lastIndex >= 0 ? (lastIndex + 1) % nonPromotionalPrizes.length : 0;
+        targetPrize = nonPromotionalPrizes[nextIndex];
+      }
+    }
+
     let createdCoupon: any = null;
-    if (toCreate > 0 && prize) {
-      for (let i = 0; i < toCreate; i++) {
+    if (targetPrize) {
+      const required = Number(targetPrize.pointsRequired ?? 0);
+      const availableStamps = Math.max(0, validStamps - totalAwardedPoints);
+      if (required > 0 && availableStamps >= required) {
         const code = crypto.randomUUID();
-        const newC = await app.repository.createCoupon(input.userId, input.businessId, prize.id, code);
-        // Preserve first created in response
-        if (!createdCoupon) createdCoupon = newC;
+        createdCoupon = await app.repository.createCoupon(input.userId, input.businessId, targetPrize.id, code);
+        coupons.push(createdCoupon);
       }
     }
 
@@ -74,14 +100,14 @@ export function registerStampsRoutes(app: FastifyInstance) {
     const userClient = new UserServiceClient({ baseUrl: process.env.USER_SERVICE_URL || 'http://user-server:3000', tokenService });
 
     const now = new Date();
-    const unredeemedCount = (await app.repository.listCoupons(input.userId, input.businessId)).filter((c: any) => !c.isRedeemed && (!c.expiredAt || new Date(c.expiredAt).getTime() > now.getTime())).length;
+    const unredeemedCount = coupons.filter((c: any) => !c.isRedeemed && (!c.expiredAt || new Date(c.expiredAt).getTime() > now.getTime())).length;
     await userClient.updateMembershipCounters({
       userId: input.userId,
       businessId: input.businessId,
       validStamps,
       validCoupons: unredeemedCount,
       totalStampsDelta: input.stamps,
-      totalCouponsDelta: toCreate,
+      totalCouponsDelta: createdCoupon ? 1 : 0,
     });
 
     return reply.code(200).send({
