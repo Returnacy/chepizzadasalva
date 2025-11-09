@@ -81,6 +81,7 @@ export function registerStampsRoutes(app: FastifyInstance) {
     }
 
     let createdCoupon: any = null;
+    let stampsUsedForCoupon = 0;
     if (targetPrize) {
       const required = Number(targetPrize.pointsRequired ?? 0);
       const availableStamps = Math.max(0, validStamps - totalAwardedPoints);
@@ -88,6 +89,7 @@ export function registerStampsRoutes(app: FastifyInstance) {
         const code = crypto.randomUUID();
         createdCoupon = await app.repository.createCoupon(input.userId, input.businessId, targetPrize.id, code);
         coupons.push(createdCoupon);
+        stampsUsedForCoupon = Math.min(required, validStamps);
       }
     }
 
@@ -101,10 +103,13 @@ export function registerStampsRoutes(app: FastifyInstance) {
 
     const now = new Date();
     const unredeemedCount = coupons.filter((c: any) => !c.isRedeemed && (!c.expiredAt || new Date(c.expiredAt).getTime() > now.getTime())).length;
+  const totalAwardedPointsAfter = totalAwardedPoints + stampsUsedForCoupon;
+  const adjustedValidStamps = Math.max(0, validStamps - totalAwardedPointsAfter);
+
     await userClient.updateMembershipCounters({
       userId: input.userId,
       businessId: input.businessId,
-      validStamps,
+      validStamps: adjustedValidStamps,
       validCoupons: unredeemedCount,
       totalStampsDelta: input.stamps,
       totalCouponsDelta: createdCoupon ? 1 : 0,
@@ -113,7 +118,7 @@ export function registerStampsRoutes(app: FastifyInstance) {
     return reply.code(200).send({
       message: 'Stamps applied',
       data: {
-        validStamps,
+        validStamps: adjustedValidStamps,
         createdCoupon: createdCoupon ? { id: createdCoupon.id, code: createdCoupon.code } : null,
       },
     });
