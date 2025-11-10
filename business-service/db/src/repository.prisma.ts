@@ -5,8 +5,9 @@ export class RepositoryPrisma {
   businessId: string;
 
   constructor() {
-    this.brandId = process.env.DEFAULT_BRAND_ID || '385d4ebb-4c4b-46e9-8701-0d71bfd7ce47';
-    this.businessId = process.env.DEFAULT_BUSINESS_ID || 'af941888-ec4c-458e-b905-21673241af3e';
+    const env = ((globalThis as any)?.process?.env ?? {}) as Record<string, string | undefined>;
+    this.brandId = env.DEFAULT_BRAND_ID ?? '385d4ebb-4c4b-46e9-8701-0d71bfd7ce47';
+    this.businessId = env.DEFAULT_BUSINESS_ID ?? 'af941888-ec4c-458e-b905-21673241af3e';
   }
 
   // Prizes
@@ -59,7 +60,7 @@ export class RepositoryPrisma {
     return nextNonPromotionalPrize;
   }
 
-  
+
   // Stamps
   async addStamp(userId: string, businessId: string) {
     return prisma.stamp.create({ data: { userId, businessId: this.businessId } });
