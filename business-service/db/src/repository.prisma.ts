@@ -75,6 +75,13 @@ export class RepositoryPrisma {
   async addStamp(userId: string, businessId: string) {
     return prisma.stamp.create({ data: { userId, businessId: this.businessId } });
   }
+  async listStamps(userId: string, businessId: string, filter?: { isRedeemed?: boolean }) {
+    const where: any = { userId, businessId };
+    if (filter?.isRedeemed !== undefined) {
+      where.isRedeemed = filter.isRedeemed;
+    }
+    return prisma.stamp.findMany({ where, orderBy: { createdAt: 'asc' } });
+  }
   async redeemStamp(stampId: string) {
     return prisma.stamp.update({ where: { id: stampId }, data: { isRedeemed: true } });
   }
