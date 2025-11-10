@@ -57,6 +57,16 @@ export class RepositoryPrisma {
       },
       orderBy: { pointsRequired: 'asc' },
     });
+    if (!nextNonPromotionalPrize) return await prisma.prize.findFirst({
+      where: {
+        OR: [
+            { businessId: this.businessId },
+            { brandId: this.brandId },
+          ],
+        isPromotional: false,
+      },
+      orderBy: { pointsRequired: 'asc' },
+    });
     return nextNonPromotionalPrize;
   }
 
