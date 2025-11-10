@@ -312,12 +312,14 @@ export async function getUser(userId: string | number): Promise<ClientType> {
   }
 }
 
-// Prize progression helper: given current stamps, compute last/next thresholds for this business
-export async function getPrizeProgression(stamps: number): Promise<{ stampsLastPrize: number; stampsNextPrize: number; lastPrizeName?: string; nextPrizeName?: string; }>
+// Prize progression helper: fetch thresholds for a given user
+export async function getPrizeProgression(userId: string): Promise<{ stampsLastPrize: number; stampsNextPrize: number; lastPrizeName?: string; nextPrizeName?: string; }>
 {
   try {
-    const businessId = getBusinessId();
-    const res = await businessHttp.post<any>('/api/v1/prizes/progression', { businessId, stamps: Math.max(0, Math.floor(Number(stamps) || 0)) });
+    const params = new URLSearchParams({
+      userId: String(userId),
+    });
+    const res = await businessHttp.get<any>(`/api/v1/prizes/progression?${params.toString()}`);
     const data = (res as any)?.data ?? res;
     return {
       stampsLastPrize: Number(data.stampsLastPrize ?? 0) || 0,
@@ -326,10 +328,8 @@ export async function getPrizeProgression(stamps: number): Promise<{ stampsLastP
       nextPrizeName: data.nextPrizeName,
     };
   } catch (error) {
-    // Fallback to 15-cycle if backend unavailable
-    const s = Math.max(0, Math.floor(Number(stamps) || 0));
     const base = 15;
-    const last = Math.floor(s / base) * base;
+    const last = Math.floor(0 / base) * base;
     return { stampsLastPrize: last, stampsNextPrize: last + base };
   }
 }

@@ -37,10 +37,11 @@ export default function CustomerPage() {
 
   // Compute prize progression for the current user's stamps
   const validStampsForProgress = client?.stamps?.validStamps ?? 0;
+  const userIdForProgress = client?.id ? String(client.id) : null;
   const progressionQuery = useQuery({
-    queryKey: ['prizeProgression', validStampsForProgress],
-    queryFn: async () => getPrizeProgression(validStampsForProgress),
-    enabled: client != null,
+    queryKey: ['prizeProgression', userIdForProgress, validStampsForProgress],
+    queryFn: async () => getPrizeProgression(userIdForProgress!),
+    enabled: !!userIdForProgress,
     staleTime: 60_000,
   });
 
@@ -56,7 +57,7 @@ export default function CustomerPage() {
   // Derive values expected by existing UI (mock / fallback if absent)
   const userData = client ? (() => {
     const validStamps = client.stamps?.validStamps ?? 0;
-    const prog = progressionQuery.data ?? { stampsLastPrize: 0, stampsNextPrize: 15 };
+  const prog = progressionQuery.data ?? { stampsLastPrize: 0, stampsNextPrize: 15 };
     const totalStampsNeeded = Math.max(1, (prog.stampsNextPrize - prog.stampsLastPrize));
     const lastPrizeStamps = prog.stampsLastPrize;
     const requiredStamps = Math.max(0, (prog.stampsNextPrize - validStamps));
@@ -100,7 +101,7 @@ export default function CustomerPage() {
     mutationFn: async ({ qrCode }: { qrCode: string }) => {
       return await createGoogleWalletPass({ qrCode });
     },
-    onSuccess: (pass) => {
+  onSuccess: (pass: { saveUrl: string; jwt: string; objectId: string; classId: string; expiresAt: string }) => {
       queryClient.setQueryData(['walletStatus', businessId], { linked: true, objectId: pass.objectId ?? null });
     },
   });
@@ -142,7 +143,7 @@ export default function CustomerPage() {
         description: "Controlla la tua casella di posta per il link di verifica.",
       });
     },
-    onError: (error) => {
+  onError: (error: unknown) => {
       toast({
         title: "Errore",
         description: "Impossibile inviare l'email di verifica. Riprova più tardi.",

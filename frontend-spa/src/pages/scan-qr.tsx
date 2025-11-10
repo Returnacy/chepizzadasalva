@@ -94,16 +94,17 @@ export default function ScanQRPage() {
       const fallbackName = data.email?.split('@')[0] || 'Utente';
       const name = (baseNameParts.join(' ').trim()) || fallbackName;
       const validStamps = data.stamps?.validStamps ?? 0;
+      const userIdForProgress = String(data.id || data.userId || userIdParam);
       // Compute progression dynamically
       let totalNeededStamps = 15;
       try {
-        getPrizeProgression(validStamps).then((prog) => {
+        getPrizeProgression(userIdForProgress).then((prog) => {
           const needed = Math.max(1, (prog.stampsNextPrize - prog.stampsLastPrize));
           setScannedUser((prev: any) => prev ? { ...prev, totalNeededStamps: needed } : prev);
         }).catch(() => {});
       } catch {}
       const mapped = {
-        id: String(data.id || data.userId || userIdParam),
+        id: userIdForProgress,
         name,
         email: data.email || undefined,
         phone: data.phone || undefined,
@@ -229,7 +230,7 @@ export default function ScanQRPage() {
       });
       console.log('[addStamps][onSuccess]', { previousStampCount, newStampCount, updatedUser });
     },
-    onError: (error) => {
+  onError: (error: any) => {
       console.error('[addStamps][onError]', error);
       toast({
         title: "Errore nell'aggiungere i timbri",
@@ -245,8 +246,8 @@ export default function ScanQRPage() {
       await http.get<any>(`/coupon-redemptions?code=${encodeURIComponent(qrCode)}`);
       return { code: qrCode, isRedeemed: true, redeemedAt: new Date().toISOString() };
     },
-    onSuccess: (redeemedCoupon) => {
-  setScannedCoupon((prev: CouponType | null) => {
+    onSuccess: (redeemedCoupon: { code: string; isRedeemed: boolean; redeemedAt?: string }) => {
+      setScannedCoupon((prev: CouponType | null) => {
         if (!prev) return prev;
         return {
           ...prev,
@@ -261,7 +262,7 @@ export default function ScanQRPage() {
         description: "Il coupon è stato utilizzato con successo. Buon appetito! 🍕",
       });
     },
-    onError: (error: any) => {
+  onError: (error: any) => {
       const errorMessage = error?.message || "Errore durante il riscatto del coupon.";
       const requiresEmailVerification = error?.requiresEmailVerification;
       

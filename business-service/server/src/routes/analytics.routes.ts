@@ -6,7 +6,8 @@ export function registerAnalyticsRoutes(app: FastifyInstance) {
   // GET /api/v1/analytics - core metrics
   app.get('/api/v1/analytics', async (request: any, reply: any) => {
     try {
-  const businessId = (request.query?.businessId as string) || (request.headers['x-business-id'] as string) || process.env.DEFAULT_BUSINESS_ID || 'af941888-ec4c-458e-b905-21673241af3e';
+      const brandId = process.env.DEFAULT_BRAND_ID || '385d4ebb-4c4b-46e9-8701-0d71bfd7ce47';
+      const businessId = process.env.DEFAULT_BUSINESS_ID || 'af941888-ec4c-458e-b905-21673241af3e';
 
       // Basic metrics using business-service data we own (stamps/coupons)
       const now = new Date();
@@ -16,7 +17,7 @@ export function registerAnalyticsRoutes(app: FastifyInstance) {
       startOfMonth.setDate(now.getDate() - 30);
 
       // Total customers from user-service: count users with membership for this business
-      const userServiceUrl = process.env.USER_SERVICE_URL || 'http://user-server:3000';
+      const userServiceUrl = process.env.USER_SERVICE_URL || 'https://user.returnacy.app';
       const tokenUrl = process.env.KEYCLOAK_TOKEN_URL;
       const clientId = process.env.KEYCLOAK_CLIENT_ID;
       const clientSecret = process.env.KEYCLOAK_CLIENT_SECRET;
@@ -60,9 +61,11 @@ export function registerAnalyticsRoutes(app: FastifyInstance) {
   // GET /api/v1/analytics/daily-transactions?days=N
   app.get('/api/v1/analytics/daily-transactions', async (request: any, reply: any) => {
     try {
+      const brandId = process.env.DEFAULT_BRAND_ID || '385d4ebb-4c4b-46e9-8701-0d71bfd7ce47';
+      const businessId = process.env.DEFAULT_BUSINESS_ID || 'af941888-ec4c-458e-b905-21673241af3e';
+
       const q = request.query || {};
       const days = Math.min(90, Math.max(1, Number(q.days || 30)));
-  const businessId = (q.businessId as string) || (request.headers['x-business-id'] as string) || process.env.DEFAULT_BUSINESS_ID || 'af941888-ec4c-458e-b905-21673241af3e';
 
       // Align to UTC midnight and compute start date (inclusive)
       const now = new Date();

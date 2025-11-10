@@ -1,124 +1,68 @@
 import { prisma } from './prismaClient.js';
 
 export class RepositoryPrisma {
-  // Ensure brand and business exist (minimal cascade)
-  async ensureBusiness(businessId: string) {
-  const SEED_BUSINESS_ID = 'af941888-ec4c-458e-b905-21673241af3e';
-  const SEED_BRAND_ID = '385d4ebb-4c4b-46e9-8701-0d71bfd7ce47';
+  brandId: string;
+  businessId: string;
 
-    const existing = await prisma.business.findUnique({ where: { id: businessId } });
-    if (existing) {
-      // If the seeded business exists but is not linked to the seeded brand, fix the link.
-      if (businessId === SEED_BUSINESS_ID && existing.brandId !== SEED_BRAND_ID) {
-        // Ensure seeded brand exists
-        const seedBrand = await prisma.brand.upsert({
-          where: { id: SEED_BRAND_ID },
-          update: {},
-          create: {
-            id: SEED_BRAND_ID,
-            name: 'Seed Brand',
-            email: '385d4ebb-4c4b-46e9-8701-0d71bfd7ce47@brand.local',
-            phone: '+10000000001',
-            address: 'N/A',
-          },
-        });
-        await prisma.business.update({
-          where: { id: existing.id },
-          data: { brandId: seedBrand.id },
-        });
-        return prisma.business.findUnique({ where: { id: businessId } });
-      }
-      return existing;
-    }
-
-    // Create seeded brand+business with stable IDs if requested
-    if (businessId === SEED_BUSINESS_ID) {
-      const seedBrand = await prisma.brand.upsert({
-        where: { id: SEED_BRAND_ID },
-        update: {},
-        create: {
-          id: SEED_BRAND_ID,
-          name: 'Seed Brand',
-          email: '385d4ebb-4c4b-46e9-8701-0d71bfd7ce47@brand.local',
-          phone: '+10000000001',
-          address: 'N/A',
-        },
-      });
-      const biz = await prisma.business.create({
-        data: {
-          id: SEED_BUSINESS_ID,
-          brandId: seedBrand.id,
-          name: 'Seed Business',
-          email: 'af941888-ec4c-458e-b905-21673241af3e@business.local',
-          phone: '+10000000002',
-          address: 'N/A',
-        },
-      });
-      return biz;
-    }
-
-    // Default path: create a minimal brand and a business with the provided id
-    const brand = await prisma.brand.create({
-      data: {
-        name: `Brand ${businessId.slice(0, 8)}`,
-        email: `${businessId}@brand.local`,
-        phone: `+${Math.floor(Math.random() * 9e9 + 1e9)}`,
-        address: 'N/A',
-      },
-    });
-    const biz = await prisma.business.create({
-      data: {
-        id: businessId,
-        brandId: brand.id,
-        name: `Business ${businessId.slice(0, 8)}`,
-        email: `${businessId}@business.local`,
-        phone: `+${Math.floor(Math.random() * 9e9 + 1e9)}`,
-        address: 'N/A',
-      },
-    });
-    return biz;
-  }
-  // Business
-  async upsertBusiness(b: { id?: string; brandId: string; name: string; email: string; phone: string; address: string; totalSms?: number; totalEmail?: number; totalPush?: number; availableSms?: number; availableEmail?: number; availablePush?: number; }) {
-    const data = {
-      brandId: b.brandId,
-      name: b.name,
-      email: b.email,
-      phone: b.phone,
-      address: b.address,
-      totalSms: b.totalSms ?? undefined,
-      totalEmail: b.totalEmail ?? undefined,
-      totalPush: b.totalPush ?? undefined,
-      availableSms: b.availableSms ?? undefined,
-      availableEmail: b.availableEmail ?? undefined,
-      availablePush: b.availablePush ?? undefined,
-    } as const;
-    if (b.id) {
-      return prisma.business.update({ where: { id: b.id }, data });
-    }
-    return prisma.business.create({ data });
-  }
-  async findBusinessById(id: string) {
-    return prisma.business.findUnique({ where: { id } });
-  }
-  async findBusinessByDomain(domain: string) {
-    // fastifyDomain was removed from the schema; domain resolution should be handled at the server layer via a mapping.
-    // For backward compatibility, return null here.
-    return null;
+  constructor() {
+    this.brandId = process.env.DEFAULT_BRAND_ID || '385d4ebb-4c4b-46e9-8701-0d71bfd7ce47';
+    this.businessId = process.env.DEFAULT_BUSINESS_ID || 'af941888-ec4c-458e-b905-21673241af3e';
   }
 
   // Prizes
-  async listPrizes(scope: { businessId?: string; brandId?: string }) {
-    return prisma.prize.findMany({ where: { businessId: scope.businessId ?? undefined, brandId: scope.brandId ?? undefined } });
+  async listPrizes() {
+    return prisma.prize.findMany({ where: { businessId: this.businessId, brandId: this.brandId } });
+  }
+  async listNonPromotionalPrizes() {
+    return prisma.prize.findMany({
+      where: {
+        businessId: this.businessId,
+        brandId: this.brandId,
+        isPromotional: false,
+      },
+      orderBy: { pointsRequired: 'asc' },
+    });
   }
   async createPrize(p: { name: string; pointsRequired: number; isPromotional?: boolean; businessId?: string | null; brandId?: string | null }) {
     return prisma.prize.create({ data: { ...p, isPromotional: p.isPromotional ?? false } });
   }
+  async getLastNonPromotionalPrize(userId: string) {
+    const lastNonPromotionalCoupon = await this.getLastNonPromotionalCoupon(userId);
+    if (!lastNonPromotionalCoupon) return null;
+    return lastNonPromotionalCoupon.prize;
+  }
+  async getNextNonPromotionalPrize(userId: string) {
+    const lastNonPromotionalPrize = await this.getLastNonPromotionalPrize(userId);
+    if (!lastNonPromotionalPrize) {
+      return prisma.prize.findFirst({
+        where: {
+          OR: [
+            { businessId: this.businessId },
+            { brandId: this.brandId },
+          ],
+          isPromotional: false,
+        },
+        orderBy: { pointsRequired: 'asc' },
+      });
+    }
+    const nextNonPromotionalPrize = await prisma.prize.findFirst({
+      where: {
+        OR: [
+            { businessId: this.businessId },
+            { brandId: this.brandId },
+          ],
+        isPromotional: false,
+        pointsRequired: { gt: lastNonPromotionalPrize?.pointsRequired ?? 0 },
+      },
+      orderBy: { pointsRequired: 'asc' },
+    });
+    return nextNonPromotionalPrize;
+  }
 
+  
   // Stamps
   async addStamp(userId: string, businessId: string) {
-    await this.ensureBusiness(businessId);
-    return prisma.stamp.create({ data: { userId, businessId } });
+    return prisma.stamp.create({ data: { userId, businessId: this.businessId } });
   }
   async redeemStamp(stampId: string) {
     return prisma.stamp.update({ where: { id: stampId }, data: { isRedeemed: true } });
@@ -144,6 +88,28 @@ export class RepositoryPrisma {
   }
   async listCoupons(userId: string, businessId: string) {
     return prisma.coupon.findMany({ where: { userId, businessId }, include: { prize: true } });
+  }
+  async listNonPromotionalCoupons(userId: string, businessId: string) {
+    return prisma.coupon.findMany({
+      where: {
+        userId,
+        businessId,
+        prize: { isPromotional: false },
+      },
+      include: { prize: true },
+      orderBy: { createdAt: 'desc' },
+    });
+  }
+  async getLastNonPromotionalCoupon(userId: string) {
+    return prisma.coupon.findFirst({
+      where: {
+        userId,
+        businessId: this.businessId,
+        prize: { isPromotional: false },
+      },
+      include: { prize: true },
+      orderBy: { createdAt: 'desc' },
+    });
   }
 
   // Capacity (available messages)

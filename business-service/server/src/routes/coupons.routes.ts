@@ -25,7 +25,20 @@ function serializeCoupon(coupon: any) {
 }
 
 export function registerCouponsRoutes(app: FastifyInstance) {
-  app.post('/api/v1/coupons', async (request: any) => {
+  app.post('/api/v1/coupons', async (request: any, reply: any) => {
+    /*Add check service*/
+    const authPayload = (request as any).auth ?? {};
+    const azp = typeof authPayload.azp === 'string' ? authPayload.azp : null;
+    const audClaim = authPayload.aud;
+    const audList = Array.isArray(audClaim)
+      ? audClaim
+      : typeof audClaim === 'string'
+        ? [audClaim]
+        : [];
+    const isCampaignService = (azp && azp === 'campaign-service') || audList.some((aud: any) => String(aud) === 'campaign-service');
+    if (!isCampaignService) {
+      return reply.status(403).send({ error: 'FORBIDDEN', message: 'Coupon creation allowed only for campaign-service' });
+    }
     const { userId, businessId, prizeId, code } = request.body as { userId: string; businessId: string; prizeId: string; code: string };
     const coupon = await app.repository.createCoupon(userId, businessId, prizeId, code, new Date(Date.now() + 30 * 24 * 60 * 60 * 1000));
     return { coupon: serializeCoupon(coupon) };

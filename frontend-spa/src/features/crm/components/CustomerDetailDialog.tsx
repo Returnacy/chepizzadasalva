@@ -25,10 +25,11 @@ export function CustomerDetailDialog({ customer, onClose, onAddStamps, onRedeemC
   const { toast } = useToast();
   // Use validStamps for progression; fallback to total stamps if not provided
   const validStamps = (customer?.validStamps ?? customer?.stamps ?? 0);
+  const userIdForProgress = customer?.id ? String(customer.id) : null;
   const progQuery = useQuery({
-    queryKey: ['crm:prizeProgression', customer?.id, validStamps],
-    queryFn: async () => getPrizeProgression(validStamps),
-    enabled: !!customer,
+    queryKey: ['crm:prizeProgression', userIdForProgress, validStamps],
+    queryFn: async () => getPrizeProgression(userIdForProgress!),
+    enabled: !!userIdForProgress,
     staleTime: 60_000,
   });
   const totalNeeded = Math.max(1, (progQuery.data?.stampsNextPrize ?? 15) - (progQuery.data?.stampsLastPrize ?? 0));

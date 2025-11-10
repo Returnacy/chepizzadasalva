@@ -62,7 +62,7 @@ export function registerUsersRoutes(app: FastifyInstance) {
       const baseUsers = queried;
 
       // Preload prizes once to compute progression for each user without extra queries
-      const prizes = await app.repository.listPrizes({ businessId });
+      const prizes = await app.repository.listPrizes();
       const thresholds = prizes
         .map((p: any) => Number(p.pointsRequired))
         .filter((n: any) => Number.isFinite(n) && n > 0)
