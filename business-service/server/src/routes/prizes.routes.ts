@@ -10,7 +10,7 @@ export function registerPrizesRoutes(app: FastifyInstance) {
   // Input: { businessId: string, stamps: number }
   // Output: { stampsLastPrize: number, stampsNextPrize: number, lastPrizeName?: string, nextPrizeName?: string }
   app.get('/api/v1/prizes/progression', async (request: any, reply: any) => {
-    const userId = request.query as { userId: string };
+    const { userId } = request.query as { userId: string };
 
     const lastPrize = await app.repository.getLastNonPromotionalPrize(userId);
     const nextPrize = await app.repository.getNextNonPromotionalPrize(userId);
