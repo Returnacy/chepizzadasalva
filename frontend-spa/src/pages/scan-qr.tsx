@@ -13,6 +13,72 @@ import { UserResult } from '../features/scan/components/UserResult';
 import { Button } from '../components/ui/button';
 import type { CouponType } from '../types/coupon';
 
+const DEFAULT_CYCLE_SIZE = 15;
+
+function normalizeScannedUser(rawUser: any, options: { userId: string; fallback?: any; progression?: { stampsLastPrize?: number; stampsNextPrize?: number; nextPrizeName?: string } }) {
+  const fallback = options?.fallback ?? {};
+  const profile = rawUser?.profile ?? fallback.profile ?? {};
+  const nameParts = [profile.name, profile.surname].filter((p: any) => typeof p === 'string' && p.trim() !== '');
+  const emailCandidate = rawUser?.email ?? fallback.email;
+  const derivedFallbackName = typeof emailCandidate === 'string' ? emailCandidate.split('@')[0] : undefined;
+  const fallbackName = typeof fallback?.name === 'string' && fallback.name.trim().length > 0 ? fallback.name : derivedFallbackName;
+  const name = (nameParts.length ? nameParts.join(' ').trim() : fallbackName) || 'Utente';
+
+  const email = rawUser?.email ?? fallback.email ?? undefined;
+  const phone = rawUser?.phone ?? fallback.phone ?? undefined;
+
+  const validStamps = Number(rawUser?.stamps?.validStamps ?? rawUser?.stamps ?? fallback.validStamps ?? fallback.stamps ?? 0) || 0;
+  const usedStamps = Number(rawUser?.stamps?.usedStamps ?? fallback.usedStamps ?? 0) || 0;
+  const totalStamps = Number(rawUser?.stamps?.totalStamps ?? fallback.totalStamps ?? validStamps + usedStamps) || 0;
+
+  const couponsData = rawUser?.coupons ?? {};
+  const validCoupons = Number(couponsData.validCoupons ?? fallback.validCoupons ?? 0) || 0;
+  const usedCoupons = Number(couponsData.usedCoupons ?? fallback.usedCoupons ?? 0) || 0;
+  const totalCoupons = Number(couponsData.totalCoupons ?? fallback.totalCoupons ?? validCoupons + usedCoupons) || 0;
+
+  const lastPrizeRaw = options?.progression?.stampsLastPrize ?? rawUser?.nextPrize?.stampsLastPrize ?? fallback.stampsLastPrize ?? 0;
+  const nextPrizeRaw = options?.progression?.stampsNextPrize ?? rawUser?.nextPrize?.stampsNextPrize ?? fallback.stampsNextPrize ?? (lastPrizeRaw + DEFAULT_CYCLE_SIZE);
+
+  let stampsLastPrize = Number(lastPrizeRaw);
+  if (!Number.isFinite(stampsLastPrize) || stampsLastPrize < 0) {
+    stampsLastPrize = 0;
+  }
+
+  let stampsNextPrize = Number(nextPrizeRaw);
+  if (!Number.isFinite(stampsNextPrize) || stampsNextPrize <= stampsLastPrize) {
+    stampsNextPrize = stampsLastPrize + DEFAULT_CYCLE_SIZE;
+  }
+
+  const cycleSize = Math.max(1, stampsNextPrize - stampsLastPrize);
+  const currentProgress = Math.max(0, validStamps - stampsLastPrize);
+  const progressInCycle = cycleSize > 0 ? (currentProgress % cycleSize) : 0;
+  const stampsToNext = Math.max(0, cycleSize - progressInCycle);
+
+  const nextPrizeName = options?.progression?.nextPrizeName
+    ?? rawUser?.nextPrize?.name
+    ?? fallback.nextPrizeName
+    ?? 'Prossimo premio';
+
+  return {
+    id: String(options.userId),
+    name,
+    email,
+    phone,
+    stamps: validStamps,
+    validStamps,
+    totalStamps,
+    totalCoupons,
+    validCoupons,
+    totalNeededStamps: cycleSize,
+    stampsLastPrize,
+    stampsNextPrize,
+    stampsCycleSize: cycleSize,
+    stampsProgress: progressInCycle,
+    stampsToNext,
+    nextPrizeName,
+  };
+}
+
 export default function ScanQRPage() {
   const [location, navigate] = useLocation();
   const [qrInput, setQrInput] = useState('');
@@ -87,43 +153,41 @@ export default function ScanQRPage() {
 
   // Map query data to scannedUser when from CRM (don't overwrite if a QR scan already set a user)
   useEffect(() => {
-    if (userQuery.data && userIdParam) {
-      const data: any = userQuery.data as any;
-      const profile = data.profile || {};
-      const baseNameParts = [profile.name, profile.surname].filter((p: string) => p && p.trim() !== '');
-      const fallbackName = data.email?.split('@')[0] || 'Utente';
-      const name = (baseNameParts.join(' ').trim()) || fallbackName;
-      const validStamps = data.stamps?.validStamps ?? 0;
-      const userIdForProgress = String(data.id || data.userId || userIdParam);
-      // Compute progression dynamically
-      let totalNeededStamps = 15;
-      try {
-        getPrizeProgression(userIdForProgress).then((prog) => {
-          const needed = Math.max(1, (prog.stampsNextPrize - prog.stampsLastPrize));
-          setScannedUser((prev: any) => prev ? { ...prev, totalNeededStamps: needed } : prev);
-        }).catch(() => {});
-      } catch {}
-      const mapped = {
-        id: userIdForProgress,
-        name,
-        email: data.email || undefined,
-        phone: data.phone || undefined,
-        stamps: validStamps,
-        totalNeededStamps,
-        totalCoupons: data.coupons?.usedCoupons ?? 0,
-        nextPrizeName: data.nextPrize?.name || 'Prossimo premio',
-      };
-      setScannedCoupon(null);
-      setScannedUser(mapped);
-      // Extract first valid (non redeemed) coupon code if available
-      try {
-        const couponsArr = data.coupons?.coupons || [];
-        const firstValid = couponsArr.find((c: any) => c && c.code && (c.isRedeemed === false || c.isRedeemed === undefined));
-        setFirstValidCouponCode(firstValid ? String(firstValid.code) : null);
-      } catch {
-        setFirstValidCouponCode(null);
-      }
+    if (!userQuery.data || !userIdParam) return;
+    let cancelled = false;
+    const data: any = userQuery.data as any;
+    const userIdForProgress = String(data.id || data.userId || userIdParam);
+    const baseUser = normalizeScannedUser(data, { userId: userIdForProgress });
+
+    setScannedCoupon(null);
+    setScannedUser(baseUser);
+
+    try {
+      const couponsArr = data.coupons?.coupons || [];
+      const firstValid = couponsArr.find((c: any) => c && c.code && (c.isRedeemed === false || c.isRedeemed === undefined));
+      setFirstValidCouponCode(firstValid ? String(firstValid.code) : null);
+    } catch {
+      setFirstValidCouponCode(null);
     }
+
+    (async () => {
+      try {
+        const progression = await getPrizeProgression(userIdForProgress);
+        if (cancelled) return;
+        setScannedUser((prev: any) => normalizeScannedUser(data, {
+          userId: userIdForProgress,
+          fallback: prev ?? baseUser,
+          progression,
+        }));
+      } catch {
+        if (cancelled) return;
+        setScannedUser((prev: any) => prev ?? baseUser);
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
   }, [userQuery.data, userIdParam]);
 
   useEffect(() => {
@@ -214,14 +278,24 @@ export default function ScanQRPage() {
       return updated;
     },
     onSuccess: (updatedUser: any) => {
-      const previousStampCount = scannedUser?.stamps ?? 0;
-      const newStampCount = (updatedUser?.stamps?.validStamps ?? updatedUser?.stamps ?? previousStampCount) as number;
-      const totalNeededStamps = updatedUser?.stamps?.neededStamps ?? 15;
-      // Preserve existing scannedUser shape
-      const preservedId = scannedUser?.id;
-      setScannedUser({ ...updatedUser, id: preservedId, stamps: newStampCount, totalNeededStamps });
+      const prevState: any = scannedUser;
+      const preservedId = prevState?.id ?? String(updatedUser?.id ?? updatedUser?.userId ?? '');
+      const previousStampCount = Math.max(0, prevState?.validStamps ?? prevState?.stamps ?? 0);
+      const normalized = normalizeScannedUser(updatedUser ?? {}, {
+        userId: preservedId,
+        fallback: prevState,
+        progression: {
+          stampsLastPrize: updatedUser?.nextPrize?.stampsLastPrize ?? prevState?.stampsLastPrize,
+          stampsNextPrize: updatedUser?.nextPrize?.stampsNextPrize ?? prevState?.stampsNextPrize,
+          nextPrizeName: updatedUser?.nextPrize?.name ?? prevState?.nextPrizeName,
+        },
+      });
+      const newStampCount = Math.max(0, normalized?.validStamps ?? normalized?.stamps ?? previousStampCount);
+      const cycleSize = Math.max(1, normalized?.stampsCycleSize ?? normalized?.totalNeededStamps ?? DEFAULT_CYCLE_SIZE);
+
+      setScannedUser(normalized);
       queryClient.invalidateQueries({ queryKey: ["/api/analytics/overview"] });
-      const newCoupons = Math.floor(newStampCount / totalNeededStamps) - Math.floor(previousStampCount / totalNeededStamps);
+      const newCoupons = Math.floor(newStampCount / cycleSize) - Math.floor(previousStampCount / cycleSize);
       toast({
         title: "Timbri aggiornati",
         description: newCoupons > 0
