@@ -316,9 +316,13 @@ export async function getUser(userId: string | number): Promise<ClientType> {
 export async function getPrizeProgression(userId: string): Promise<{ stampsLastPrize: number; stampsNextPrize: number; lastPrizeName?: string; nextPrizeName?: string; }>
 {
   try {
+    const businessId = getBusinessId();
     const params = new URLSearchParams({
       userId: String(userId),
     });
+    if (businessId) {
+      params.set('businessId', String(businessId));
+    }
     const res = await businessHttp.get<any>(`/api/v1/prizes/progression?${params.toString()}`);
     const data = (res as any)?.data ?? res;
     return {
@@ -329,8 +333,7 @@ export async function getPrizeProgression(userId: string): Promise<{ stampsLastP
     };
   } catch (error) {
     const base = 15;
-    const last = Math.floor(0 / base) * base;
-    return { stampsLastPrize: last, stampsNextPrize: last + base };
+    return { stampsLastPrize: 0, stampsNextPrize: base };
   }
 }
 

@@ -41,6 +41,10 @@ interface UserType {
   birthday?: string;
   stampsToNext?: number;
   nextPrizeName?: string;
+  stampsLastPrize?: number;
+  stampsNextPrize?: number;
+  stampsCycleSize?: number;
+  stampsProgress?: number;
 }
 import { useToast } from '../hooks/use-toast';
 import { useLocation } from 'wouter';
@@ -164,9 +168,10 @@ export default function CRMPage() {
     // Next prize info from server mapping (if present via adapter)
     const stampsLastPrize = u.nextPrize?.stampsLastPrize ?? 0;
     const stampsNextPrize = u.nextPrize?.stampsNextPrize ?? Math.floor(((validStamps ?? 0)) / 15) * 15 + 15;
-    const stampsNeeded = Math.max(1, stampsNextPrize - stampsLastPrize);
-    const currentProgress = Math.max(0, (validStamps ?? 0) - stampsLastPrize);
-    const stampsToNext = Math.max(0, stampsNeeded - (currentProgress % stampsNeeded));
+  const stampsNeeded = Math.max(1, stampsNextPrize - stampsLastPrize);
+  const currentProgress = Math.max(0, (validStamps ?? 0) - stampsLastPrize);
+  const progressInCycle = stampsNeeded > 0 ? currentProgress % stampsNeeded : 0;
+  const stampsToNext = Math.max(0, stampsNeeded - progressInCycle);
     const nextPrizeName = (u.nextPrize?.name ?? 'Prossimo premio') || 'Prossimo premio';
     return {
       id: String(u.id),
@@ -183,6 +188,10 @@ export default function CRMPage() {
       // Derived for list item display
       stampsToNext,
       nextPrizeName,
+      stampsLastPrize,
+      stampsNextPrize,
+      stampsCycleSize: stampsNeeded,
+      stampsProgress: progressInCycle,
     } as UserType;
   });
 
