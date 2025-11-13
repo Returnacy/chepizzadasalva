@@ -19,7 +19,7 @@ export function UserResult({ user, stampCounter, onInc, onDec, onApply, applying
   const stampsLastPrize = Math.max(0, user?.stampsLastPrize ?? 0);
   const currentProgress = Math.max(0, validStamps - stampsLastPrize);
   const progressInCycle = cycleSize > 0 ? currentProgress % cycleSize : 0;
-  const stampsToNext = user?.stampsToNext ?? Math.max(0, cycleSize - progressInCycle);
+  const stampsToNext = Math.max(0, cycleSize - progressInCycle);
   const progressPercent = cycleSize > 0 ? (progressInCycle / cycleSize) * 100 : 0;
   return (
     <div className="space-y-6">
