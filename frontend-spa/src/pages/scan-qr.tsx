@@ -50,7 +50,10 @@ function normalizeScannedUser(rawUser: any, options: { userId: string; fallback?
   }
 
   const cycleSize = Math.max(1, stampsNextPrize - stampsLastPrize);
-  const currentProgress = Math.max(0, validStamps - stampsLastPrize);
+  const cycleBase = Math.max(0, validStamps - (validStamps % cycleSize));
+  const normalizedLastPrize = Math.max(0, Math.min(stampsLastPrize, cycleBase));
+  const normalizedNextPrize = normalizedLastPrize + cycleSize;
+  const currentProgress = Math.max(0, validStamps - normalizedLastPrize);
   const progressInCycle = cycleSize > 0 ? (currentProgress % cycleSize) : 0;
   const stampsToNext = Math.max(0, cycleSize - progressInCycle);
 
@@ -65,13 +68,13 @@ function normalizeScannedUser(rawUser: any, options: { userId: string; fallback?
     email,
     phone,
     stamps: validStamps,
-    validStamps,
-    totalStamps,
-    totalCoupons,
-    validCoupons,
-    totalNeededStamps: cycleSize,
-    stampsLastPrize,
-    stampsNextPrize,
+  validStamps,
+  totalStamps,
+  totalCoupons,
+  validCoupons,
+  totalNeededStamps: cycleSize,
+  stampsLastPrize: normalizedLastPrize,
+  stampsNextPrize: normalizedNextPrize,
     stampsCycleSize: cycleSize,
     stampsProgress: progressInCycle,
     stampsToNext,
