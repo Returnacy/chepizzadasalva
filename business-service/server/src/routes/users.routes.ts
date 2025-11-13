@@ -100,8 +100,19 @@ export function registerUsersRoutes(app: FastifyInstance) {
         return { stampsLastPrize, stampsNextPrize, nextPrizeName };
       }
 
-      const data = await Promise.all(baseUsers.map(async (u: BasicUser) => {
-        const stats = await app.repository.getUserStatsForBusiness(u.id, businessId);
+      const statsMap = await app.repository.getUsersStatsForBusiness(
+        baseUsers.map((user: BasicUser) => String(user.id)),
+        businessId
+      );
+
+      const data = baseUsers.map((u: BasicUser) => {
+        const stats = statsMap.get(String(u.id)) ?? {
+          totalStamps: 0,
+          validStamps: 0,
+          couponsCount: 0,
+          totalCoupons: 0,
+          lastVisit: null,
+        };
         const upstreamValidStamps = (u as any).stats?.validStamps;
         const upstreamTotalStamps = (u as any).stats?.totalStamps;
         const upstreamValidCoupons = (u as any).stats?.validCoupons;
@@ -109,23 +120,23 @@ export function registerUsersRoutes(app: FastifyInstance) {
         const validStamps = upstreamValidStamps ?? stats.validStamps ?? 0;
         const totalStamps = upstreamTotalStamps ?? stats.totalStamps ?? validStamps;
         const prog = computeProgression(validStamps || 0);
-              return {
-                id: u.id,
-                email: u.email,
-                phone: u.phone,
-                name: (u as any).name,
-                surname: (u as any).surname,
-                birthday: u.birthday ?? null,
-                validStamps,
-                totalStamps,
-                couponsCount: upstreamValidCoupons ?? stats.couponsCount, // unredeemed & not expired
-                totalCoupons: stats.totalCoupons, // total earned (redeemed + unredeemed)
-                lastVisit: upstreamLastVisit ?? (stats.lastVisit ? new Date(stats.lastVisit).toISOString() : null),
-                stampsLastPrize: prog.stampsLastPrize,
-                stampsNextPrize: prog.stampsNextPrize,
-                nextPrizeName: prog.nextPrizeName,
-              };
-      }));
+        return {
+          id: u.id,
+          email: u.email,
+          phone: u.phone,
+          name: (u as any).name,
+          surname: (u as any).surname,
+          birthday: u.birthday ?? null,
+          validStamps,
+          totalStamps,
+          couponsCount: upstreamValidCoupons ?? stats.couponsCount,
+          totalCoupons: stats.totalCoupons,
+          lastVisit: upstreamLastVisit ?? (stats.lastVisit ? new Date(stats.lastVisit).toISOString() : null),
+          stampsLastPrize: prog.stampsLastPrize,
+          stampsNextPrize: prog.stampsNextPrize,
+          nextPrizeName: prog.nextPrizeName,
+        };
+      });
       return reply.code(200).send({ message: 'Users retrieved successfully', data });
     } catch (e: any) {
       app.log.error(e);

@@ -302,29 +302,102 @@ export class RepositoryPrisma {
 
   // CRM Users list - this relies on an external user-service normally. For now, return an empty list placeholder.
   // Extend later if a local mirror exists. Here we only provide stamp/coupon counts enrichment API.
-  async getUserStatsForBusiness(userId: string, businessId: string) {
+  async getUsersStatsForBusiness(userIds: string[], businessId: string) {
+    const normalizedIds = Array.from(
+      new Set(
+        userIds
+          .map(id => (id ?? '').toString().trim())
+          .filter(id => id.length > 0)
+      )
+    );
+
+    const stats = new Map<string, { totalStamps: number; validStamps: number; couponsCount: number; totalCoupons: number; lastVisit: Date | null }>();
+    if (normalizedIds.length === 0) {
+      return stats;
+    }
+
+    normalizedIds.forEach(id => {
+      stats.set(id, { totalStamps: 0, validStamps: 0, couponsCount: 0, totalCoupons: 0, lastVisit: null });
+    });
+
     const now = new Date();
-    const [totalStamps, validStamps, unredeemedActiveCount, totalCoupons, lastStamp, lastCoupon] = await Promise.all([
-      prisma.stamp.count({ where: { userId, businessId } }),
-      prisma.stamp.count({ where: { userId, businessId, isRedeemed: false } }),
-      prisma.coupon.count({
+
+    const [stampTotals, validStampTotals, couponTotals, activeCoupons] = await Promise.all([
+      prisma.stamp.groupBy({
+        by: ['userId'],
+        where: { businessId, userId: { in: normalizedIds } },
+        _count: { _all: true },
+        _max: { createdAt: true },
+      }),
+      prisma.stamp.groupBy({
+        by: ['userId'],
+        where: { businessId, userId: { in: normalizedIds }, isRedeemed: false },
+        _count: { _all: true },
+      }),
+      prisma.coupon.groupBy({
+        by: ['userId'],
+        where: { businessId, userId: { in: normalizedIds } },
+        _count: { _all: true },
+        _max: { createdAt: true },
+      }),
+      prisma.coupon.groupBy({
+        by: ['userId'],
         where: {
-          userId,
           businessId,
+          userId: { in: normalizedIds },
           isRedeemed: false,
           OR: [
             { expiredAt: null },
             { expiredAt: { gt: now } },
           ],
         },
+        _count: { _all: true },
       }),
-      prisma.coupon.count({ where: { userId, businessId } }),
-      prisma.stamp.findFirst({ where: { userId, businessId }, orderBy: { createdAt: 'desc' }, select: { createdAt: true } }),
-      prisma.coupon.findFirst({ where: { userId, businessId }, orderBy: { createdAt: 'desc' }, select: { createdAt: true } }),
     ]);
-    const lastVisitDate = [lastStamp?.createdAt ?? null, lastCoupon?.createdAt ?? null]
-      .filter((d): d is Date => d instanceof Date)
-      .sort((a, b) => b.getTime() - a.getTime())[0] || null;
-    return { totalStamps, validStamps, couponsCount: unredeemedActiveCount, totalCoupons, lastVisit: lastVisitDate };
+
+    for (const row of stampTotals) {
+      const entry = stats.get(row.userId);
+      if (!entry) continue;
+      entry.totalStamps = row._count?._all ?? 0;
+      const createdAt = row._max?.createdAt ?? null;
+      if (createdAt && (!entry.lastVisit || createdAt > entry.lastVisit)) {
+        entry.lastVisit = createdAt;
+      }
+    }
+
+    for (const row of validStampTotals) {
+      const entry = stats.get(row.userId);
+      if (!entry) continue;
+      entry.validStamps = row._count?._all ?? 0;
+    }
+
+    for (const row of couponTotals) {
+      const entry = stats.get(row.userId);
+      if (!entry) continue;
+      entry.totalCoupons = row._count?._all ?? 0;
+      const createdAt = row._max?.createdAt ?? null;
+      if (createdAt && (!entry.lastVisit || createdAt > entry.lastVisit)) {
+        entry.lastVisit = createdAt;
+      }
+    }
+
+    for (const row of activeCoupons) {
+      const entry = stats.get(row.userId);
+      if (!entry) continue;
+      entry.couponsCount = row._count?._all ?? 0;
+    }
+
+    return stats;
+  }
+
+  async getUserStatsForBusiness(userId: string, businessId: string) {
+    const stats = await this.getUsersStatsForBusiness([userId], businessId);
+    return stats.get((userId ?? '').toString().trim()) ?? {
+      totalStamps: 0,
+      validStamps: 0,
+      couponsCount: 0,
+      totalCoupons: 0,
+      lastVisit: null,
+    };
   }
 }
