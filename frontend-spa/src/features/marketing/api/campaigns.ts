@@ -1,4 +1,4 @@
-import { campaignHttp } from '../../../lib/servicesHttp';
+import { campaignHttp, getBusinessId } from '../../../lib/servicesHttp';
 
 // Backend-aligned status values
 export type CampaignStatus = 'DRAFT' | 'ACTIVE' | 'PAUSED' | 'COMPLETED';
@@ -42,7 +42,16 @@ function mapDetailed(raw: any): CampaignDetailed {
 }
 
 export async function fetchCampaigns(): Promise<CampaignListItem[]> {
-  const res = await campaignHttp.get<any>('/api/v1/campaigns');
+  // Add tenant context to filter campaigns by current brand/business
+  const businessId = getBusinessId();
+
+  const params = new URLSearchParams();
+  if (businessId) {
+    params.append('businessId', businessId);
+  }
+
+  const url = params.toString() ? `/api/v1/campaigns?${params}` : '/api/v1/campaigns';
+  const res = await campaignHttp.get<any>(url);
   const data = (res as any)?.data ?? res;
   return Array.isArray(data) ? data.map(mapListItem) : [];
 }
