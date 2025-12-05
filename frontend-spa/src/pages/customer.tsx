@@ -57,21 +57,13 @@ export default function CustomerPage() {
   // Derive values expected by existing UI (mock / fallback if absent)
   const userData = client ? (() => {
     const validStamps = client.stamps?.validStamps ?? 0;
-    const prog = progressionQuery.data ?? { stampsLastPrize: 0, stampsNextPrize: 15 };
     
-    // Ensure stampsLastPrize doesn't exceed user's current stamps
-    // This handles edge cases where user received a coupon but stamps were reset/reduced
-    const effectiveLastPrize = Math.min(prog.stampsLastPrize, validStamps);
+    // Use stampsNeededForNextPrize from the /me endpoint for accurate calculation
+    const stampsNeeded = client.nextPrize?.stampsNeededForNextPrize ?? 14;
     
-    // Ensure stampsNextPrize is always greater than effectiveLastPrize
-    let effectiveNextPrize = prog.stampsNextPrize;
-    if (effectiveNextPrize <= effectiveLastPrize) {
-      effectiveNextPrize = effectiveLastPrize + 15; // Default step
-    }
+    // Total stamps to display = current stamps + stamps still needed
+    const totalStampsNeeded = Math.max(1, validStamps + stampsNeeded);
     
-    const totalStampsNeeded = Math.max(1, (effectiveNextPrize - effectiveLastPrize));
-    const lastPrizeStamps = effectiveLastPrize;
-    const requiredStamps = Math.max(0, (effectiveNextPrize - validStamps));
     return {
       id: client.id,
       name: client.profile?.name || client.profile?.surname || client.email?.split('@')[0] || 'Utente',
@@ -79,9 +71,9 @@ export default function CustomerPage() {
       phone: client.phone || undefined,
       stamps: validStamps,
       totalStamps: totalStampsNeeded,
-      lastStamps: lastPrizeStamps,
-      requiredStamps,
-      nextPrizeName: progressionQuery.data?.nextPrizeName || client.nextPrize?.name || 'Prossimo premio',
+      lastStamps: 0, // Always show progress from 0 in the visual
+      requiredStamps: stampsNeeded,
+      nextPrizeName: client.nextPrize?.name || 'Prossimo premio',
       totalCoupons: client.coupons?.usedCoupons ?? 0,
       isEmailVerified: client.isVerified ?? true, // assume verified if flag not reliable
       qrCode: `qr-${client.id}` // stub qrCode (backend to provide real code later)
@@ -274,22 +266,16 @@ export default function CustomerPage() {
             </div>
 
             <div className="flex justify-center mb-6">
-              {(() => {
-                const stampsInCycle = Math.max(0, (userData?.stamps || 0) - (userData?.lastStamps || 0));
-                const maxInCycle = Math.max(1, userData?.totalStamps || 1);
-                return (
-                  <LoyaltyCard
-                    stamps={stampsInCycle}
-                    maxStamps={maxInCycle}
-                    className="transform scale-110"
-                  />
-                );
-              })()}
+              <LoyaltyCard
+                stamps={userData?.stamps || 0}
+                maxStamps={userData?.totalStamps || 15}
+                className="transform scale-110"
+              />
             </div>
 
             <div className="text-center">
               <p className="text-2xl font-bold">
-                {Math.max(0, (userData?.stamps || 0) - (userData?.lastStamps || 0))} / {Math.max(1, userData?.totalStamps || 1)} Timbri
+                {userData?.stamps || 0} / {userData?.totalStamps || 15} Timbri
               </p>
               <p className="text-red-100 mt-2">
                 {userData && userData.requiredStamps > 0
