@@ -315,6 +315,7 @@ export async function getUser(userId: string | number): Promise<ClientType> {
 // Prize progression helper: fetch thresholds for a given user
 export async function getPrizeProgression(userId: string): Promise<{ stampsLastPrize: number; stampsNextPrize: number; lastPrizeName?: string; nextPrizeName?: string; }>
 {
+  const DEFAULT_BASE = 15;
   try {
     const businessId = getBusinessId();
     const params = new URLSearchParams({
@@ -325,15 +326,22 @@ export async function getPrizeProgression(userId: string): Promise<{ stampsLastP
     }
     const res = await businessHttp.get<any>(`/api/v1/prizes/progression?${params.toString()}`);
     const data = (res as any)?.data ?? res;
+    const stampsLastPrize = Number(data.stampsLastPrize ?? 0) || 0;
+    let stampsNextPrize = Number(data.stampsNextPrize ?? DEFAULT_BASE) || DEFAULT_BASE;
+    
+    // Ensure stampsNextPrize is always greater than stampsLastPrize
+    if (stampsNextPrize <= stampsLastPrize) {
+      stampsNextPrize = stampsLastPrize + DEFAULT_BASE;
+    }
+    
     return {
-      stampsLastPrize: Number(data.stampsLastPrize ?? 0) || 0,
-      stampsNextPrize: Number(data.stampsNextPrize ?? 15) || 15,
+      stampsLastPrize,
+      stampsNextPrize,
       lastPrizeName: data.lastPrizeName,
       nextPrizeName: data.nextPrizeName,
     };
   } catch (error) {
-    const base = 15;
-    return { stampsLastPrize: 0, stampsNextPrize: base };
+    return { stampsLastPrize: 0, stampsNextPrize: DEFAULT_BASE };
   }
 }
 

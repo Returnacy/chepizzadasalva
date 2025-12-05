@@ -57,13 +57,24 @@ export default function CustomerPage() {
   // Derive values expected by existing UI (mock / fallback if absent)
   const userData = client ? (() => {
     const validStamps = client.stamps?.validStamps ?? 0;
-  const prog = progressionQuery.data ?? { stampsLastPrize: 0, stampsNextPrize: 15 };
-    const totalStampsNeeded = Math.max(1, (prog.stampsNextPrize - prog.stampsLastPrize));
-    const lastPrizeStamps = prog.stampsLastPrize;
-    const requiredStamps = Math.max(0, (prog.stampsNextPrize - validStamps));
+    const prog = progressionQuery.data ?? { stampsLastPrize: 0, stampsNextPrize: 15 };
+    
+    // Ensure stampsLastPrize doesn't exceed user's current stamps
+    // This handles edge cases where user received a coupon but stamps were reset/reduced
+    const effectiveLastPrize = Math.min(prog.stampsLastPrize, validStamps);
+    
+    // Ensure stampsNextPrize is always greater than effectiveLastPrize
+    let effectiveNextPrize = prog.stampsNextPrize;
+    if (effectiveNextPrize <= effectiveLastPrize) {
+      effectiveNextPrize = effectiveLastPrize + 15; // Default step
+    }
+    
+    const totalStampsNeeded = Math.max(1, (effectiveNextPrize - effectiveLastPrize));
+    const lastPrizeStamps = effectiveLastPrize;
+    const requiredStamps = Math.max(0, (effectiveNextPrize - validStamps));
     return {
       id: client.id,
-  name: client.profile?.name || client.profile?.surname || client.email?.split('@')[0] || 'Utente',
+      name: client.profile?.name || client.profile?.surname || client.email?.split('@')[0] || 'Utente',
       email: client.email || undefined,
       phone: client.phone || undefined,
       stamps: validStamps,
