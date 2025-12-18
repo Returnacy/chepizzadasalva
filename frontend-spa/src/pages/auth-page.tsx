@@ -145,10 +145,13 @@ export default function AuthPage() {
       }
 
       const redirectUri = `${window.location.origin}/auth`;
-      const loginUri = `${userServiceBase}/api/v1/auth/google/redirect?redirect_uri=${encodeURIComponent(redirectUri)}`;
+      // Avoid putting query params on login_uri: Google may require an exact match.
+      // We pass our intended SPA redirect target via `state` instead.
+      const loginUri = `${userServiceBase}/api/v1/auth/google/redirect`;
+      const state = JSON.stringify({ redirect_uri: redirectUri });
 
       // Redirect mode avoids popup + postMessage (which can be blocked by COOP).
-      ga.initialize({ client_id: googleClientId, ux_mode: 'redirect', login_uri: loginUri });
+      ga.initialize({ client_id: googleClientId, ux_mode: 'redirect', login_uri: loginUri, state });
       ga.renderButton(container, {
         theme: 'outline', size: 'large', type: 'standard', text: activeTab === 'register' ? 'signup_with' : 'signin_with', width: 320,
       });
