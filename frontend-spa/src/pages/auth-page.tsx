@@ -11,6 +11,7 @@ import { useLoginForm, useRegisterForm, useAuthMethodToggle, RegistrationFormVal
 import { LoginForm } from '../features/auth/components/LoginForm';
 import { RegisterForm } from '../features/auth/components/RegisterForm';
 import { useToast } from '../hooks/use-toast';
+import { tokenService } from '../lib/token-service';
 
 export default function AuthPage() {
   const [, setLocation] = useLocation();
@@ -33,6 +34,41 @@ export default function AuthPage() {
   const loginForm = useLoginForm();
   const registerForm = useRegisterForm();
   const { loginMethod, setLoginMethod, signupMethod, setSignupMethod } = useAuthMethodToggle();
+
+  // If we come back from a Google redirect flow, tokens are delivered via URL hash.
+  // Example: /auth#accessToken=...&refreshToken=...
+  useEffect(() => {
+    const raw = (typeof window !== 'undefined' ? window.location.hash : '') || '';
+    const hash = raw.startsWith('#') ? raw.slice(1) : raw;
+    if (!hash) return;
+    const params = new URLSearchParams(hash);
+    const access = params.get('accessToken') || params.get('access_token');
+    const refresh = params.get('refreshToken') || params.get('refresh_token');
+    const error = params.get('error');
+
+    if (access) tokenService.setAccessToken(access);
+    if (refresh) tokenService.setRefreshToken(refresh);
+
+    if (access || refresh || error) {
+      // Clean up URL (avoid keeping tokens in history)
+      try {
+        window.history.replaceState({}, document.title, window.location.pathname + window.location.search);
+      } catch {}
+    }
+
+    if (error) {
+      toast({
+        title: 'Accesso con Google fallito',
+        description: error,
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    if (access) {
+      setLocation('/');
+    }
+  }, [setLocation, toast]);
 
   const decodeJwtPayload = (credential: string): Record<string, any> | null => {
     try {
@@ -63,6 +99,12 @@ export default function AuthPage() {
     setLoginMethod('password');
   }, [setLoginMethod]);
 
+  // Ensure register keeps the password submit button available.
+  // The method toggle UI was removed, but the value persists in localStorage.
+  useEffect(() => {
+    setSignupMethod('password');
+  }, [setSignupMethod]);
+
   // Load GIS script once and render the official button for the active tab only
   useEffect(() => {
     if (!googleEnabled) return;
@@ -89,84 +131,24 @@ export default function AuthPage() {
       if (loginContainer) loginContainer.innerHTML = '';
       if (signupContainer) signupContainer.innerHTML = '';
 
-      const containerId = activeTab === 'register' ? 'google-signup-btn' : 'google-login-btn';
+      // We only support Google *login* here using redirect mode (avoids COOP/postMessage issues).
+      if (activeTab !== 'login') return;
+      const containerId = 'google-login-btn';
       const container = document.getElementById(containerId);
       if (!container) return;
 
-      const callback = async (response: any) => {
-        const token = response?.credential as string | undefined;
-        if (!token) return;
+      const userServiceBase = ((import.meta as any).env?.VITE_USER_SERVICE_URL || (import.meta as any).env?.VITE_API_BASE_URL || '').replace(/\/$/, '');
+      if (!userServiceBase) {
+        // eslint-disable-next-line no-console
+        console.warn('VITE_USER_SERVICE_URL is missing; Google redirect login cannot be initialized.');
+        return;
+      }
 
-        const profile = decodeJwtPayload(token);
-        const googleEmail = typeof profile?.email === 'string' ? profile.email.toLowerCase() : undefined;
+      const redirectUri = `${window.location.origin}/auth`;
+      const loginUri = `${userServiceBase}/api/v1/auth/google/redirect?redirect_uri=${encodeURIComponent(redirectUri)}`;
 
-        if (googleEmail) {
-          registerForm.setValue('email', googleEmail, { shouldDirty: true, shouldValidate: true });
-          loginForm.setValue('email', googleEmail, { shouldDirty: true });
-        }
-
-        const currentRegisterValues = registerForm.getValues();
-        if (profile?.given_name && !(currentRegisterValues.name?.trim())) {
-          registerForm.setValue('name', profile.given_name, { shouldDirty: true });
-        }
-        if (profile?.family_name && !(currentRegisterValues.surname?.trim())) {
-          registerForm.setValue('surname', profile.family_name, { shouldDirty: true });
-        }
-
-        if (activeTab === 'register') {
-          const base = registerForm.getValues();
-          const emailInput = (base?.email || googleEmail || '').trim().toLowerCase();
-          const ok = Boolean(
-            emailInput &&
-            base?.acceptedTermsAndConditions &&
-            base?.acceptedPrivacyPolicy &&
-            base?.name && base.name.trim().length >= 2 &&
-            base?.surname && base.surname.trim().length >= 2 &&
-            base?.birthdate && /^\d{4}-\d{2}-\d{2}$/.test(base.birthdate)
-          );
-          if (!ok) {
-            toast({
-              title: 'Completa i campi richiesti',
-              description: 'Compila nome, cognome, email, data di nascita e accetta termini e privacy prima di continuare con Google.',
-              variant: 'destructive',
-            });
-            return;
-          }
-
-          const payload: SignupInput = {
-            authType: 'oauth',
-            provider: 'google',
-            idToken: token,
-            email: emailInput,
-            name: base.name.trim(),
-            surname: base.surname.trim(),
-            birthdate: base.birthdate,
-            acceptedTermsAndConditions: base.acceptedTermsAndConditions,
-            acceptedPrivacyPolicy: base.acceptedPrivacyPolicy,
-            phone: base.phone ? (String(base.phone).trim() || undefined) : undefined,
-          };
-
-          try {
-            await registerMutation.mutateAsync(payload);
-            setLocation('/');
-          } catch {}
-        } else {
-          const loginValues = loginForm.getValues();
-          const loginEmail = googleEmail || loginValues.email || undefined;
-          const payload: LoginInput = {
-            authType: 'oauth',
-            provider: 'google',
-            idToken: token,
-            email: loginEmail,
-          };
-          try {
-            await loginMutation.mutateAsync(payload);
-            setLocation('/');
-          } catch {}
-        }
-      };
-
-      ga.initialize({ client_id: googleClientId, callback, ux_mode: 'popup' });
+      // Redirect mode avoids popup + postMessage (which can be blocked by COOP).
+      ga.initialize({ client_id: googleClientId, ux_mode: 'redirect', login_uri: loginUri });
       ga.renderButton(container, {
         theme: 'outline', size: 'large', type: 'standard', text: activeTab === 'register' ? 'signup_with' : 'signin_with', width: 320,
       });
@@ -174,7 +156,7 @@ export default function AuthPage() {
     };
 
     render();
-  }, [googleEnabled, googleClientId, activeTab, registerForm, loginMutation, registerMutation, setLocation, toast]);
+  }, [googleEnabled, googleClientId, activeTab, loginForm, registerForm, loginMutation, registerMutation, setLocation, toast]);
 
   const onPasswordLogin = async (data: { email: string; password: string }) => {
     const payload: LoginInput = { authType: 'password', email: data.email, password: data.password } as const;
