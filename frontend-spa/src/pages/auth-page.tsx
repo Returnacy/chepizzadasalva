@@ -137,21 +137,25 @@ export default function AuthPage() {
       const container = document.getElementById(containerId);
       if (!container) return;
 
-      const userServiceBase = ((import.meta as any).env?.VITE_USER_SERVICE_URL || (import.meta as any).env?.VITE_API_BASE_URL || '').replace(/\/$/, '');
-      if (!userServiceBase) {
-        // eslint-disable-next-line no-console
-        console.warn('VITE_USER_SERVICE_URL is missing; Google redirect login cannot be initialized.');
-        return;
-      }
+      // Use GIS popup mode (same as other business frontends).
+      // This avoids needing any Google OAuth "Authorized redirect URIs" entries for user-service.
+      const callback = async (resp: any) => {
+        const token = resp?.credential;
+        if (!token) return;
+        const loginValues = loginForm.getValues();
+        const payload: LoginInput = {
+          authType: 'oauth',
+          provider: 'google',
+          idToken: token,
+          email: loginValues.email || undefined,
+        };
+        try {
+          await loginMutation.mutateAsync(payload);
+          setLocation('/');
+        } catch {}
+      };
 
-      const redirectUri = `${window.location.origin}/auth`;
-      // Avoid putting query params on login_uri: Google may require an exact match.
-      // We pass our intended SPA redirect target via `state` instead.
-      const loginUri = `${userServiceBase}/api/v1/auth/google/redirect`;
-      const state = JSON.stringify({ redirect_uri: redirectUri });
-
-      // Redirect mode avoids popup + postMessage (which can be blocked by COOP).
-      ga.initialize({ client_id: googleClientId, ux_mode: 'redirect', login_uri: loginUri, state });
+      ga.initialize({ client_id: googleClientId, callback, ux_mode: 'popup' });
       ga.renderButton(container, {
         theme: 'outline', size: 'large', type: 'standard', text: activeTab === 'register' ? 'signup_with' : 'signin_with', width: 320,
       });
