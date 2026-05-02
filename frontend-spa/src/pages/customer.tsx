@@ -58,8 +58,12 @@ export default function CustomerPage() {
   const userData = client ? (() => {
     const validStamps = client.stamps?.validStamps ?? 0;
     
-    // Use stampsNeededForNextPrize from the /me endpoint for accurate calculation
-    const stampsNeeded = client.nextPrize?.stampsNeededForNextPrize ?? 14;
+    // Use stampsNeededForNextPrize from the /me endpoint for accurate calculation.
+    // Fallback derives the threshold from the user's current cycle position so
+    // totalStampsNeeded (validStamps + stampsNeeded) lands on a multiple of 15.
+    const CYCLE_SIZE = 15;
+    const stampsNeeded = client.nextPrize?.stampsNeededForNextPrize
+      ?? Math.max(1, CYCLE_SIZE - (validStamps % CYCLE_SIZE));
     
     // Total stamps to display = current stamps + stamps still needed
     const totalStampsNeeded = Math.max(1, validStamps + stampsNeeded);
