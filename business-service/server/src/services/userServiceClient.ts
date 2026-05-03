@@ -31,8 +31,11 @@ export class UserServiceClient {
   private http: AxiosInstance;
   private tokenService: TokenService;
 
-  constructor(opts: { baseUrl: string; tokenService: TokenService }) {
-    this.http = axios.create({ baseURL: opts.baseUrl.replace(/\/$/, '') });
+  constructor(opts: { baseUrl: string; tokenService: TokenService; timeoutMs?: number }) {
+    this.http = axios.create({
+      baseURL: opts.baseUrl.replace(/\/$/, ''),
+      timeout: opts.timeoutMs ?? 5000,
+    });
     this.tokenService = opts.tokenService;
   }
 

@@ -88,24 +88,36 @@ export function registerStampsRoutes(app: FastifyInstance) {
       }
     }
 
-    // 3) Sync counters to user-service via internal service-auth endpoint
-    const tokenService = new TokenService({
-      tokenUrl: process.env.KEYCLOAK_TOKEN_URL!,
-      clientId: process.env.KEYCLOAK_CLIENT_ID!,
-      clientSecret: process.env.KEYCLOAK_CLIENT_SECRET!,
-    });
-    const userClient = new UserServiceClient({ baseUrl: process.env.USER_SERVICE_URL || 'http://user-server:3000', tokenService });
-
-    const now = new Date();
-
-    await userClient.updateMembershipCounters({
-      userId: input.userId,
-      businessId: input.businessId,
-      validStamps: createdCoupon? validStamps - stampsNeededForNextPrize : validStamps,
-      validCoupons: createdCoupon ? 1 : 0,
-      totalStampsDelta: input.stamps,
-      totalCouponsDelta: createdCoupon ? 1 : 0,
-    });
+    // 3) Sync counters to user-service via internal service-auth endpoint.
+    // This is best-effort: the chepizza DB is the source of truth, so a sync
+    // failure must NOT cause the staff's request to fail. Otherwise the staff
+    // sees an error and assumes no coupon was created — but the coupon WAS
+    // created here in chepizza's DB and would only become visible on reload.
+    try {
+      const tokenService = new TokenService({
+        tokenUrl: process.env.KEYCLOAK_TOKEN_URL!,
+        clientId: process.env.KEYCLOAK_CLIENT_ID!,
+        clientSecret: process.env.KEYCLOAK_CLIENT_SECRET!,
+      });
+      const userClient = new UserServiceClient({
+        baseUrl: process.env.USER_SERVICE_URL || 'http://user-server:3000',
+        tokenService,
+        timeoutMs: 5000,
+      });
+      await userClient.updateMembershipCounters({
+        userId: input.userId,
+        businessId: input.businessId,
+        validStamps: createdCoupon? validStamps - stampsNeededForNextPrize : validStamps,
+        validCoupons: createdCoupon ? 1 : 0,
+        totalStampsDelta: input.stamps,
+        totalCouponsDelta: createdCoupon ? 1 : 0,
+      });
+    } catch (err) {
+      app.log.error(
+        { err, userId: input.userId, businessId: input.businessId, couponCreated: !!createdCoupon },
+        '[business-service] membership counter sync to user-service failed; coupon and stamp redemption already persisted in chepizza DB',
+      );
+    }
 
     return reply.code(200).send({
       message: 'Stamps applied',
