@@ -6,7 +6,7 @@ import { QRCode } from "../components/qr-code";
 import { Gift, CheckCircle, AlertCircle, Mail, Loader2, WalletCards } from "lucide-react";
 import { Link } from "wouter";
 import { apiRequest } from "../lib/queryClient";
-import { createGoogleWalletPass, getClientProfile, getGoogleWalletStatus, getPrizeProgression } from "../lib/legacy-api-adapter";
+import { createGoogleWalletPass, getClientProfile, getGoogleWalletStatus, getPrizeProgression, getUserCoupons } from "../lib/legacy-api-adapter";
 import type { ClientType } from "../types/client";
 import { useToast } from "../hooks/use-toast";
 import loyaltyLogo from "@assets/che_pizza_fidelity_logo_horizontal.png";
@@ -54,6 +54,18 @@ export default function CustomerPage() {
 
   const walletLinked = walletStatusQuery.data?.linked ?? false;
 
+  // Fetch coupons directly from chepizza (the source of truth) rather than
+  // relying on /me's nested coupons.coupons. /me's nested list depends on a
+  // user-service → chepizza hop that has been intermittently failing during
+  // Phase 2.7 cutover; the CRM bypasses /me for the same reason.
+  const couponsQuery = useQuery<CouponType[] | null>({
+    queryKey: ['customerCoupons', client?.id, businessId],
+    queryFn: async () => (client?.id ? getUserCoupons(String(client.id)) : null),
+    enabled: !!client?.id && !!businessId,
+    staleTime: 10_000,
+    refetchOnWindowFocus: true,
+  });
+
   // Derive values expected by existing UI (mock / fallback if absent)
   const userData = client ? (() => {
     const validStamps = client.stamps?.validStamps ?? 0;
@@ -97,7 +109,17 @@ export default function CustomerPage() {
     qrCode: (user as any).qr_code || 'qr-stub'
   } : null;
 
-  const coupons = client?.coupons?.coupons || [];
+  // Prefer the direct chepizza fetch; fall back to /me's nested list if the
+  // direct call is still loading or returns null (filter to unredeemed + unexpired).
+  const directCoupons = couponsQuery.data ?? null;
+  const meCoupons = (client?.coupons?.coupons || []) as CouponType[];
+  const now = Date.now();
+  const coupons: CouponType[] = (directCoupons ?? meCoupons).filter((c: any) => {
+    if (c?.isRedeemed) return false;
+    const exp = c?.expiredAt ? new Date(c.expiredAt).getTime() : null;
+    if (exp !== null && exp <= now) return false;
+    return true;
+  });
   const lastVisit = client?.lastVisit ? new Date(client.lastVisit) : null;
 
   const googleWalletMutation = useMutation<
