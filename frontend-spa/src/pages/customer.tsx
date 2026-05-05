@@ -69,17 +69,30 @@ export default function CustomerPage() {
   // Derive values expected by existing UI (mock / fallback if absent)
   const userData = client ? (() => {
     const validStamps = client.stamps?.validStamps ?? 0;
-    
-    // Use stampsNeededForNextPrize from the /me endpoint for accurate calculation.
-    // Fallback derives the threshold from the user's current cycle position so
-    // totalStampsNeeded (validStamps + stampsNeeded) lands on a multiple of 15.
+
+    // Prefer the direct chepizza progression query (source of truth). Fall back
+    // to /me's nextPrize for backwards compat during the deploy window when the
+    // backend still embeds it; final fallback is local cycle math so the card
+    // always renders something sensible even if both upstream sources are down.
     const CYCLE_SIZE = 15;
-    const stampsNeeded = client.nextPrize?.stampsNeededForNextPrize
-      ?? Math.max(1, CYCLE_SIZE - (validStamps % CYCLE_SIZE));
-    
+    const progression = progressionQuery.data;
+    const stampsNeeded = (() => {
+      if (progression && typeof progression.stampsNextPrize === 'number') {
+        return Math.max(1, progression.stampsNextPrize - validStamps);
+      }
+      if (typeof client.nextPrize?.stampsNeededForNextPrize === 'number') {
+        return client.nextPrize.stampsNeededForNextPrize;
+      }
+      return Math.max(1, CYCLE_SIZE - (validStamps % CYCLE_SIZE));
+    })();
+
     // Total stamps to display = current stamps + stamps still needed
     const totalStampsNeeded = Math.max(1, validStamps + stampsNeeded);
-    
+
+    const nextPrizeName = progression?.nextPrizeName
+      ?? client.nextPrize?.name
+      ?? 'Prossimo premio';
+
     return {
       id: client.id,
       name: client.profile?.name || client.profile?.surname || client.email?.split('@')[0] || 'Utente',
@@ -89,7 +102,7 @@ export default function CustomerPage() {
       totalStamps: totalStampsNeeded,
       lastStamps: 0, // Always show progress from 0 in the visual
       requiredStamps: stampsNeeded,
-      nextPrizeName: client.nextPrize?.name || 'Prossimo premio',
+      nextPrizeName,
       totalCoupons: client.coupons?.usedCoupons ?? 0,
       isEmailVerified: client.isVerified ?? true, // assume verified if flag not reliable
       qrCode: `qr-${client.id}` // stub qrCode (backend to provide real code later)
