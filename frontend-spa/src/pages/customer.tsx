@@ -71,19 +71,31 @@ export default function CustomerPage() {
     const validStamps = client.stamps?.validStamps ?? 0;
 
     // Prefer the direct chepizza progression query (source of truth). Fall back
-    // to /me's nextPrize for backwards compat during the deploy window when the
-    // backend still embeds it; final fallback is local cycle math so the card
-    // always renders something sensible even if both upstream sources are down.
+    // to /me's nextPrize for backwards compat during the deploy window; final
+    // fallback is local cycle math so the card always renders something
+    // sensible even if both upstream sources are down.
+    //
+    // Sanity: chepizza returns stampsLastPrize == stampsNextPrize for users
+    // who have already redeemed the only configured prize. legacy-api-adapter
+    // bumps stampsNextPrize by CYCLE_SIZE in that case so callers always see a
+    // future target — but for users mid-cycle (validStamps low after a coupon
+    // redemption) that bump produces "1/30" instead of "1/15". When the
+    // reported diff is more than one cycle away, we assume the bump kicked in
+    // and use cycle math relative to the user's current valid stamps instead.
     const CYCLE_SIZE = 15;
     const progression = progressionQuery.data;
     const stampsNeeded = (() => {
-      if (progression && typeof progression.stampsNextPrize === 'number') {
-        return Math.max(1, progression.stampsNextPrize - validStamps);
+      if (progression && typeof progression.stampsNextPrize === 'number'
+          && progression.stampsNextPrize > validStamps) {
+        const diff = progression.stampsNextPrize - validStamps;
+        if (diff <= CYCLE_SIZE) return diff;
       }
-      if (typeof client.nextPrize?.stampsNeededForNextPrize === 'number') {
+      if (typeof client.nextPrize?.stampsNeededForNextPrize === 'number'
+          && client.nextPrize.stampsNeededForNextPrize > 0) {
         return client.nextPrize.stampsNeededForNextPrize;
       }
-      return Math.max(1, CYCLE_SIZE - (validStamps % CYCLE_SIZE));
+      const positionInCycle = validStamps % CYCLE_SIZE;
+      return positionInCycle === 0 ? CYCLE_SIZE : CYCLE_SIZE - positionInCycle;
     })();
 
     // Total stamps to display = current stamps + stamps still needed
