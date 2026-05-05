@@ -44,9 +44,27 @@ function normalizeScannedUser(rawUser: any, options: { userId: string; fallback?
     stampsLastPrize = 0;
   }
 
+  // Resolve the next-prize target. Trust the upstream value only when it
+  // points to a sane forward target — above validStamps and within one
+  // CYCLE_SIZE of the user's current position. Otherwise re-anchor to the
+  // next CYCLE_SIZE boundary above validStamps.
+  //
+  // Why: chepizza returns stampsLastPrize == stampsNextPrize for users past
+  // the only configured prize. legacy-api-adapter.getPrizeProgression bumps
+  // stampsNextPrize by CYCLE_SIZE in that case so callers always see a
+  // forward target — but for a user mid-cycle (validStamps low after a
+  // coupon redemption) that bump points one full cycle past their actual
+  // position, producing "1 / 30" instead of "1 / 15". The cycleBase
+  // normalization below used to mask this; this anchoring makes the intent
+  // explicit and matches the customer.tsx logic.
   let stampsNextPrize = Number(nextPrizeRaw);
-  if (!Number.isFinite(stampsNextPrize) || stampsNextPrize <= stampsLastPrize) {
-    stampsNextPrize = stampsLastPrize + DEFAULT_CYCLE_SIZE;
+  const candidateForward = Number.isFinite(stampsNextPrize)
+    && stampsNextPrize > validStamps
+    && stampsNextPrize - validStamps <= DEFAULT_CYCLE_SIZE;
+  if (!candidateForward) {
+    const positionInCycle = validStamps % DEFAULT_CYCLE_SIZE;
+    stampsNextPrize = validStamps + (positionInCycle === 0 ? DEFAULT_CYCLE_SIZE : DEFAULT_CYCLE_SIZE - positionInCycle);
+    stampsLastPrize = Math.max(0, stampsNextPrize - DEFAULT_CYCLE_SIZE);
   }
 
   const cycleSize = Math.max(1, stampsNextPrize - stampsLastPrize);
