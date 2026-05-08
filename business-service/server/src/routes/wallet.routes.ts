@@ -33,13 +33,7 @@ function collectOrigins(request: any): string[] {
 }
 
 function createUserServiceClient(): UserServiceClient {
-  const tokenUrl = process.env.KEYCLOAK_TOKEN_URL;
-  const clientId = process.env.KEYCLOAK_CLIENT_ID;
-  const clientSecret = process.env.KEYCLOAK_CLIENT_SECRET;
-  if (!tokenUrl || !clientId || !clientSecret) {
-    throw new Error('MISSING_SERVICE_AUTH_CONFIG');
-  }
-  const tokenService = new TokenService({ tokenUrl, clientId, clientSecret });
+  const tokenService = TokenService.fromEnv();
   const baseUrl = process.env.USER_SERVICE_URL || 'http://user-server:3000';
   return new UserServiceClient({ baseUrl, tokenService });
 }

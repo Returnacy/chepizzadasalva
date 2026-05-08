@@ -94,11 +94,7 @@ export function registerStampsRoutes(app: FastifyInstance) {
     // sees an error and assumes no coupon was created — but the coupon WAS
     // created here in chepizza's DB and would only become visible on reload.
     try {
-      const tokenService = new TokenService({
-        tokenUrl: process.env.KEYCLOAK_TOKEN_URL!,
-        clientId: process.env.KEYCLOAK_CLIENT_ID!,
-        clientSecret: process.env.KEYCLOAK_CLIENT_SECRET!,
-      });
+      const tokenService = TokenService.fromEnv();
       const userClient = new UserServiceClient({
         baseUrl: process.env.USER_SERVICE_URL || 'http://user-server:3000',
         tokenService,

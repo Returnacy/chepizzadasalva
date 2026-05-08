@@ -18,13 +18,7 @@ export function registerAnalyticsRoutes(app: FastifyInstance) {
 
       // Total customers from user-service: count users with membership for this business
       const userServiceUrl = process.env.USER_SERVICE_URL || 'https://user.returnacy.app';
-      const tokenUrl = process.env.KEYCLOAK_TOKEN_URL;
-      const clientId = process.env.KEYCLOAK_CLIENT_ID;
-      const clientSecret = process.env.KEYCLOAK_CLIENT_SECRET;
-      if (!tokenUrl || !clientId || !clientSecret) {
-        throw new Error('Missing KEYCLOAK_TOKEN_URL, KEYCLOAK_CLIENT_ID or KEYCLOAK_CLIENT_SECRET for business-service');
-      }
-      const tokenService = new TokenService({ tokenUrl, clientId, clientSecret });
+      const tokenService = TokenService.fromEnv();
       const userClient = new UserServiceClient({ baseUrl: userServiceUrl, tokenService });
       const totalCustomers = await userClient.countUsersByBusiness(businessId);
 

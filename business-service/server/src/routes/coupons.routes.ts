@@ -49,14 +49,7 @@ export function registerCouponsRoutes(app: FastifyInstance) {
     const coupon = await app.repository.redeemCoupon(id);
 
     try {
-      if (!process.env.KEYCLOAK_TOKEN_URL || !process.env.KEYCLOAK_CLIENT_ID || !process.env.KEYCLOAK_CLIENT_SECRET) {
-        throw new Error('Missing Keycloak client credentials for coupon sync');
-      }
-      const tokenService = new TokenService({
-        tokenUrl: process.env.KEYCLOAK_TOKEN_URL,
-        clientId: process.env.KEYCLOAK_CLIENT_ID,
-        clientSecret: process.env.KEYCLOAK_CLIENT_SECRET,
-      });
+      const tokenService = TokenService.fromEnv();
       const userClient = new UserServiceClient({ baseUrl: process.env.USER_SERVICE_URL || 'http://user-server:3000', tokenService });
       const now = new Date();
       const remaining = (await app.repository.listCoupons(coupon.userId, coupon.businessId)).filter(

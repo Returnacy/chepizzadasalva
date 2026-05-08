@@ -28,14 +28,7 @@ export function registerUsersRoutes(app: FastifyInstance) {
 
       // Integrate with user-service (or mock-user-service) to fetch base users
       const userServiceUrl = process.env.USER_SERVICE_URL || 'http://user-server:3000';
-      const tokenUrl = process.env.KEYCLOAK_TOKEN_URL;
-      const clientId = process.env.KEYCLOAK_CLIENT_ID;
-      const clientSecret = process.env.KEYCLOAK_CLIENT_SECRET;
-
-      if (!tokenUrl || !clientId || !clientSecret) {
-        throw new Error('Missing KEYCLOAK_TOKEN_URL, KEYCLOAK_CLIENT_ID or KEYCLOAK_CLIENT_SECRET for business-service');
-      }
-      const tokenService = new TokenService({ tokenUrl, clientId, clientSecret });
+      const tokenService = TokenService.fromEnv();
       const userClient = new UserServiceClient({ baseUrl: userServiceUrl, tokenService });
 
       const queryFilters: NonNullable<Parameters<typeof userClient.queryUsers>[0]>['filters'] = {};

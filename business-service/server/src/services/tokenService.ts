@@ -14,10 +14,13 @@ export type GetAccessTokenOptions = {
 const BUFFER_SECONDS = 10;
 const DEFAULT_TTL_SECONDS = 60;
 
-function isSelfIssuedMode(): boolean {
+function isSelfIssuedFlagOn(): boolean {
   const flag = String(process.env.USE_SELF_ISSUED_SERVICE_TOKENS ?? '').toLowerCase().trim();
-  const flagOn = flag === 'true' || flag === '1' || flag === 'yes';
-  return flagOn
+  return flag === 'true' || flag === '1' || flag === 'yes';
+}
+
+function isSelfIssuedMode(): boolean {
+  return isSelfIssuedFlagOn()
     && Boolean(process.env.SERVICE_TOKEN_URL)
     && Boolean(process.env.SERVICE_CLIENT_ID)
     && Boolean(process.env.SERVICE_CLIENT_SECRET);
@@ -33,6 +36,16 @@ export class TokenService {
     this.clientId = config.clientId;
     this.clientSecret = config.clientSecret;
     this.tokenUrl = config.tokenUrl;
+  }
+
+  public static fromEnv(): TokenService {
+    const tokenUrl = process.env.KEYCLOAK_TOKEN_URL ?? '';
+    const clientId = process.env.KEYCLOAK_CLIENT_ID ?? '';
+    const clientSecret = process.env.KEYCLOAK_CLIENT_SECRET ?? '';
+    if (!isSelfIssuedFlagOn() && (!tokenUrl || !clientId || !clientSecret)) {
+      throw new Error('Missing KEYCLOAK_TOKEN_URL, KEYCLOAK_CLIENT_ID or KEYCLOAK_CLIENT_SECRET (and USE_SELF_ISSUED_SERVICE_TOKENS not enabled)');
+    }
+    return new TokenService({ tokenUrl, clientId, clientSecret });
   }
 
   public async getAccessToken(opts: GetAccessTokenOptions = {}): Promise<string> {
