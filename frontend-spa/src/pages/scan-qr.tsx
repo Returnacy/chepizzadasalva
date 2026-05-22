@@ -2,7 +2,7 @@
 // Refactored Scan QR page into feature components
 import { useState, useEffect } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { getUser, addStamps as addStampsLegacy, getPrizeProgression, getCouponByCode, redeemCoupon as redeemCouponLegacy } from '../lib/legacy-api-adapter';
+import { getUser, addStamps as addStampsLegacy, getPrizeProgression, getUserCoupons, getCouponByCode, redeemCoupon as redeemCouponLegacy } from '../lib/legacy-api-adapter';
 import { useToast } from '../hooks/use-toast';
 import { useLocation, Link } from 'wouter';
 import { ModeSelector } from '../features/scan/components/ModeSelector';
@@ -182,14 +182,24 @@ export default function ScanQRPage() {
 
     setScannedCoupon(null);
     setScannedUser(baseUser);
+    setFirstValidCouponCode(null);
 
-    try {
-      const couponsArr = data.coupons?.coupons || [];
-      const firstValid = couponsArr.find((c: any) => c && c.code && (c.isRedeemed === false || c.isRedeemed === undefined));
-      setFirstValidCouponCode(firstValid ? String(firstValid.code) : null);
-    } catch {
-      setFirstValidCouponCode(null);
-    }
+    // Phase 2.6 removed the chepizza coupon fan-out from the user-service
+    // response, so `data.coupons.coupons` is always empty here. Fetch coupons
+    // directly from chepizza-business (same pattern as customer.tsx) so the
+    // "Visualizza Coupon Disponibile" one-click redeem shortcut reappears when
+    // freshly-added stamps have earned a coupon.
+    (async () => {
+      try {
+        const coupons = await getUserCoupons(userIdForProgress);
+        if (cancelled) return;
+        const firstValid = (coupons ?? []).find((c: any) => c && c.code && !c.isRedeemed);
+        setFirstValidCouponCode(firstValid ? String(firstValid.code) : null);
+      } catch {
+        if (cancelled) return;
+        setFirstValidCouponCode(null);
+      }
+    })();
 
     (async () => {
       try {
