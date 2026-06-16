@@ -525,7 +525,9 @@ export async function getCouponByCode(code: string): Promise<CouponType | null> 
 
 export async function redeemCoupon(couponId: string | number): Promise<{ success: boolean }> {
   try {
-    await businessHttp.patch(`/api/v1/coupons/${encodeURIComponent(String(couponId))}/redeem`, {});
+    // Pass the staff's current location so the redemption is attributed to where
+    // it happened (may differ from where the coupon was earned under a shared wallet).
+    await businessHttp.patch(`/api/v1/coupons/${encodeURIComponent(String(couponId))}/redeem`, { businessId: getBusinessId() });
     return { success: true };
   } catch (error) {
     throw normalizeError(error);

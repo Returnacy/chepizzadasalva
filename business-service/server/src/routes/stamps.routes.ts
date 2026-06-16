@@ -39,6 +39,13 @@ export function registerStampsRoutes(app: FastifyInstance) {
       return reply.code(400).send({ message: 'Invalid userId' });
     }
 
+    // Guard: the location being stamped at must belong to this brand. This both
+    // catches a stale/forged businessId from the staff app and ensures the stamp
+    // is attributed to a real location (the per-location data integrity contract).
+    if (!(await app.repository.isBusinessInBrand(input.businessId))) {
+      return reply.code(400).send({ message: 'Unknown location for this brand' });
+    }
+
     // 1) Add N stamps in business DB
     for (let i = 0; i < input.stamps; i++) {
       await app.repository.addStamp(input.userId, input.businessId);
@@ -103,6 +110,11 @@ export function registerStampsRoutes(app: FastifyInstance) {
       await userClient.updateMembershipCounters({
         userId: input.userId,
         businessId: input.businessId,
+        // Under a BRAND wallet the counters live on the brand-scoped membership,
+        // not on a per-location one (which may not exist for this location) — so
+        // tell user-service to resolve the membership by brand.
+        brandId: app.repository.brandId,
+        scope: await app.repository.getWalletScope(),
         validStamps: createdCoupon? validStamps - stampsNeededForNextPrize : validStamps,
         validCoupons: createdCoupon ? 1 : 0,
         totalStampsDelta: input.stamps,

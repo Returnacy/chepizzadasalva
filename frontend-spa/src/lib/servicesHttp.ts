@@ -1,5 +1,6 @@
 import { tokenService } from './token-service';
 import { withTokenRetry } from './retry-middleware';
+import { getSelectedLocation } from './staffLocation';
 
 type Options = {
   body?: any;
@@ -78,5 +79,10 @@ export const businessHttp = createHttp(BUSINESS_BASE);
 export const campaignHttp = createHttp(CAMPAIGN_BASE);
 
 export function getBusinessId(): string {
+  // Prefer the staff member's chosen location for the day (set via the location
+  // picker) so stamps attribute to the right pizzeria. Falls back to the build
+  // default for customers and single-location brands.
+  const selected = getSelectedLocation();
+  if (selected?.id) return selected.id;
   return ENV.VITE_BUSINESS_ID || 'af941888-ec4c-458e-b905-21673241af3e';
 }

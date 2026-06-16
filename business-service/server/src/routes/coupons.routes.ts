@@ -46,7 +46,12 @@ export function registerCouponsRoutes(app: FastifyInstance) {
 
   app.patch('/api/v1/coupons/:id/redeem', async (request: any) => {
     const { id } = request.params as { id: string };
-    const coupon = await app.repository.redeemCoupon(id);
+    // Optional: location where the coupon is being redeemed (may differ from where
+    // it was earned under a shared brand wallet). Best-effort attribution.
+    const redeemedBusinessId = (request.body as any)?.businessId
+      ? String((request.body as any).businessId)
+      : null;
+    const coupon = await app.repository.redeemCoupon(id, redeemedBusinessId);
 
     try {
       const tokenService = TokenService.fromEnv();
@@ -58,6 +63,8 @@ export function registerCouponsRoutes(app: FastifyInstance) {
       await userClient.updateMembershipCounters({
         userId: coupon.userId,
         businessId: coupon.businessId,
+        brandId: app.repository.brandId,
+        scope: await app.repository.getWalletScope(),
         validCoupons: remaining,
       });
     } catch (err) {

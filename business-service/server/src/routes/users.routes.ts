@@ -16,6 +16,8 @@ const usersSchema = z.object({
     minStamp: z.number().min(0).optional(),
   }).optional(),
   businessId: z.string().optional(),
+  // Optional per-location drill-down under a BRAND wallet (e.g. "only Lissaro").
+  locationId: z.string().optional(),
 });
 
 export function registerUsersRoutes(app: FastifyInstance) {
@@ -25,6 +27,19 @@ export function registerUsersRoutes(app: FastifyInstance) {
       const input = usersSchema.parse(request.body ?? {});
       const businessId = input.businessId || (request.query?.businessId as string | undefined);
       if (!businessId) return reply.code(400).send({ message: 'businessId required' });
+
+      // Resolve CRM scope. Under a BRAND wallet the CRM is brand-wide; an explicit
+      // locationId narrows the membership query AND the stamp/coupon stats to one
+      // pizzeria (per-location drill-down). Under LOCATION scope it stays single.
+      const scope = await app.repository.getWalletScope();
+      const brandId = app.repository.brandId;
+      const drillLocation = input.locationId && (await app.repository.isBusinessInBrand(input.locationId))
+        ? input.locationId
+        : null;
+      const useBrandScope = scope === 'BRAND' && !drillLocation;
+      const statsScope: string | string[] = drillLocation
+        ? drillLocation
+        : (scope === 'BRAND' ? await app.repository.getBrandBusinessIds() : businessId);
 
       // Integrate with user-service (or mock-user-service) to fetch base users
       const userServiceUrl = process.env.USER_SERVICE_URL || 'http://user-server:3000';
@@ -46,7 +61,8 @@ export function registerUsersRoutes(app: FastifyInstance) {
         page: input.page,
         limit: input.limit,
         search: input.search,
-        businessId,
+        businessId: useBrandScope ? undefined : (drillLocation ?? businessId),
+        brandId: useBrandScope ? brandId : undefined,
         minStamp: input.filter?.minStamp,
         sortBy: input.sortBy,
         sortOrder: input.sortOrder,
@@ -95,7 +111,7 @@ export function registerUsersRoutes(app: FastifyInstance) {
 
       const statsMap = await app.repository.getUsersStatsForBusiness(
         baseUsers.map((user: BasicUser) => String(user.id)),
-        businessId
+        statsScope
       );
 
       const data = baseUsers.map((u: BasicUser) => {

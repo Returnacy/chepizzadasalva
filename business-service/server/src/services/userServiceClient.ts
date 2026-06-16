@@ -8,6 +8,7 @@ export type QueryUsersParams = {
   offset?: number;
   search?: string;
   businessId?: string;
+  brandId?: string;
   minStamp?: number;
   sortBy?: 'name' | 'stamp' | 'coupon' | 'lastVisit';
   sortOrder?: 'asc' | 'desc';
@@ -56,7 +57,10 @@ export class UserServiceClient {
       // so we intentionally do NOT include targetingRules here to avoid AND-restricting by email only.
       limit,
       page,
-      businessId: params.businessId ?? null,
+      // Under a BRAND wallet, scope the CRM to the whole brand; otherwise to the
+      // single location. user-service honours brandId when businessId is absent.
+      businessId: params.brandId ? null : (params.businessId ?? null),
+      brandId: params.brandId ?? undefined,
       search: params.search || undefined,
     };
     if (offset > 0) payload.offset = offset;
@@ -79,6 +83,8 @@ export class UserServiceClient {
   async updateMembershipCounters(args: {
     userId: string;
     businessId: string;
+    brandId?: string;
+    scope?: 'LOCATION' | 'BRAND';
     validStamps?: number;
     validCoupons?: number;
     totalStampsDelta?: number;
@@ -89,6 +95,8 @@ export class UserServiceClient {
       `/internal/v1/users/${encodeURIComponent(args.userId)}/memberships/counters`,
       {
         businessId: args.businessId,
+        brandId: args.brandId,
+        scope: args.scope,
         validStamps: args.validStamps,
         validCoupons: args.validCoupons,
         totalStampsDelta: args.totalStampsDelta,
@@ -125,23 +133,32 @@ export class UserServiceClient {
     return res.data ?? { linked: true, objectId: payload.objectId ?? null };
   }
 
-  async countUsersByBusiness(businessId: string): Promise<number> {
+  // Scope a customer count to a single location or the whole brand. user-service
+  // counts by brand when brandId is sent and businessId is omitted.
+  async countUsers(scope: { businessId?: string; brandId?: string }): Promise<number> {
     const headers = await this.authHeaders();
-    const res = await this.http.get(`/internal/v1/users/count`, {
-      params: { businessId },
-      headers,
-    });
+    const params = scope.brandId ? { brandId: scope.brandId } : { businessId: scope.businessId };
+    const res = await this.http.get(`/internal/v1/users/count`, { params, headers });
     const count = res.data?.count ?? (res as any)?.count;
     return Number.isFinite(count) ? Number(count) : 0;
   }
 
-  async countNewUsersSince(businessId: string, since: Date): Promise<number> {
+  async countNewUsers(scope: { businessId?: string; brandId?: string }, since: Date): Promise<number> {
     const headers = await this.authHeaders();
-    const res = await this.http.get(`/internal/v1/users/count-new`, {
-      params: { businessId, since: since.toISOString() },
-      headers,
-    });
+    const params = scope.brandId
+      ? { brandId: scope.brandId, since: since.toISOString() }
+      : { businessId: scope.businessId, since: since.toISOString() };
+    const res = await this.http.get(`/internal/v1/users/count-new`, { params, headers });
     const count = res.data?.count ?? (res as any)?.count;
     return Number.isFinite(count) ? Number(count) : 0;
+  }
+
+  // Back-compat single-location wrappers.
+  async countUsersByBusiness(businessId: string): Promise<number> {
+    return this.countUsers({ businessId });
+  }
+
+  async countNewUsersSince(businessId: string, since: Date): Promise<number> {
+    return this.countNewUsers({ businessId }, since);
   }
 }

@@ -1,13 +1,58 @@
 import { prisma } from './prismaClient.js';
 
+type WalletScope = 'LOCATION' | 'BRAND';
+
 export class RepositoryPrisma {
   brandId: string;
   businessId: string;
+  private _walletScope: WalletScope | null = null;
+  private _brandBusinessIds: string[] | null = null;
 
   constructor() {
     const env = ((globalThis as any)?.process?.env ?? {}) as Record<string, string | undefined>;
     this.brandId = env.DEFAULT_BRAND_ID ?? '385d4ebb-4c4b-46e9-8701-0d71bfd7ce47';
     this.businessId = env.DEFAULT_BUSINESS_ID ?? 'af941888-ec4c-458e-b905-21673241af3e';
+  }
+
+  // --- Wallet scope -----------------------------------------------------------
+  // A brand's wallet is either per-location (LOCATION, default) or shared across
+  // all its locations (BRAND). Reads that compute a customer's balance/progression
+  // span the brand's businesses under BRAND scope, and stay per-location otherwise.
+  // Cached per repository instance (a singleton); changes take effect on restart,
+  // which is fine since wallet scope and the set of locations change rarely.
+  async getWalletScope(): Promise<WalletScope> {
+    if (this._walletScope) return this._walletScope;
+    const brand = await prisma.brand.findUnique({ where: { id: this.brandId }, select: { walletScope: true } });
+    this._walletScope = ((brand?.walletScope as WalletScope) ?? 'LOCATION');
+    return this._walletScope;
+  }
+
+  async getBrandBusinessIds(): Promise<string[]> {
+    if (this._brandBusinessIds) return this._brandBusinessIds;
+    const rows = await prisma.business.findMany({ where: { brandId: this.brandId }, select: { id: true } });
+    this._brandBusinessIds = rows.map(r => r.id);
+    return this._brandBusinessIds;
+  }
+
+  async isBusinessInBrand(businessId: string): Promise<boolean> {
+    return (await this.getBrandBusinessIds()).includes(businessId);
+  }
+
+  // Locations of the brand, for the staff "which location today" picker.
+  async listBrandLocations() {
+    return prisma.business.findMany({
+      where: { brandId: this.brandId },
+      select: { id: true, name: true, address: true },
+      orderBy: { createdAt: 'asc' },
+    });
+  }
+
+  // Prisma `businessId` filter honoring wallet scope: the whole brand under BRAND,
+  // the single passed location under LOCATION.
+  private async walletBusinessFilter(businessId: string): Promise<string | { in: string[] }> {
+    const scope = await this.getWalletScope();
+    if (scope === 'BRAND') return { in: await this.getBrandBusinessIds() };
+    return businessId;
   }
 
   // Prizes
@@ -73,10 +118,13 @@ export class RepositoryPrisma {
 
   // Stamps
   async addStamp(userId: string, businessId: string) {
-    return prisma.stamp.create({ data: { userId, businessId: this.businessId } });
+    // Attribute the stamp to the location it was earned at (the caller-supplied
+    // businessId), not the repository default — this is what makes per-location
+    // data real while the brand wallet still aggregates across locations.
+    return prisma.stamp.create({ data: { userId, businessId } });
   }
   async listStamps(userId: string, businessId: string, filter?: { isRedeemed?: boolean }) {
-    const where: any = { userId, businessId };
+    const where: any = { userId, businessId: await this.walletBusinessFilter(businessId) };
     if (filter?.isRedeemed !== undefined) {
       where.isRedeemed = filter.isRedeemed;
     }
@@ -86,7 +134,7 @@ export class RepositoryPrisma {
     return prisma.stamp.update({ where: { id: stampId }, data: { isRedeemed: true } });
   }
   async countValidStamps(userId: string, businessId: string) {
-    return prisma.stamp.count({ where: { userId, businessId, isRedeemed: false } });
+    return prisma.stamp.count({ where: { userId, businessId: await this.walletBusinessFilter(businessId), isRedeemed: false } });
   }
 
   // Coupons
@@ -95,23 +143,26 @@ export class RepositoryPrisma {
     return prisma.coupon.create({ data: { userId, businessId, prizeId, code, expiredAt: defaultExpiry }, include: { prize: true } });
   }
   async findCouponByCode(code: string, businessId: string) {
-    return prisma.coupon.findFirst({ where: { code, businessId }, include: { prize: true } });
+    // Code is globally unique; scoping by the wallet filter lets a BRAND-scoped
+    // coupon be found (and redeemed) at any of the brand's locations, while
+    // LOCATION scope keeps redemption to the issuing location.
+    return prisma.coupon.findFirst({ where: { code, businessId: await this.walletBusinessFilter(businessId) }, include: { prize: true } });
   }
-  async redeemCoupon(couponId: string) {
+  async redeemCoupon(couponId: string, redeemedBusinessId?: string | null) {
     return prisma.coupon.update({
       where: { id: couponId },
-      data: { isRedeemed: true, redeemedAt: new Date() },
+      data: { isRedeemed: true, redeemedAt: new Date(), redeemedBusinessId: redeemedBusinessId ?? undefined },
       include: { prize: true },
     });
   }
   async listCoupons(userId: string, businessId: string) {
-    return prisma.coupon.findMany({ where: { userId, businessId }, include: { prize: true } });
+    return prisma.coupon.findMany({ where: { userId, businessId: await this.walletBusinessFilter(businessId) }, include: { prize: true } });
   }
   async listNonPromotionalCoupons(userId: string, businessId: string) {
     return prisma.coupon.findMany({
       where: {
         userId,
-        businessId,
+        businessId: await this.walletBusinessFilter(businessId),
         prize: { isPromotional: false },
       },
       include: { prize: true },
@@ -122,7 +173,7 @@ export class RepositoryPrisma {
     return prisma.coupon.findFirst({
       where: {
         userId,
-        businessId: this.businessId,
+        businessId: await this.walletBusinessFilter(this.businessId),
         prize: { isPromotional: false },
       },
       include: { prize: true },
@@ -142,31 +193,40 @@ export class RepositoryPrisma {
   }
 
   // Analytics helpers
-  async countStampsInRange(businessId: string, from: Date, to: Date) {
-    return prisma.stamp.count({ where: { businessId, createdAt: { gte: from, lt: to } } });
+  // `businessId` accepts a single location id or an array (brand-wide aggregate
+  // with optional per-location drill-down). `bizWhere` normalises it for Prisma.
+  private bizWhere(businessId: string | string[]) {
+    return Array.isArray(businessId) ? { in: businessId } : businessId;
+  }
+  private bizArray(businessId: string | string[]): string[] {
+    return Array.isArray(businessId) ? businessId : [businessId];
   }
 
-  async countRedeemedCouponsInRange(businessId: string, from: Date, to: Date) {
-    return prisma.coupon.count({ where: { businessId, isRedeemed: true, redeemedAt: { gte: from, lt: to } } });
+  async countStampsInRange(businessId: string | string[], from: Date, to: Date) {
+    return prisma.stamp.count({ where: { businessId: this.bizWhere(businessId), createdAt: { gte: from, lt: to } } });
   }
 
-  async countTotalCouponsRedeemed(businessId: string) {
-    return prisma.coupon.count({ where: { businessId, isRedeemed: true } });
+  async countRedeemedCouponsInRange(businessId: string | string[], from: Date, to: Date) {
+    return prisma.coupon.count({ where: { businessId: this.bizWhere(businessId), isRedeemed: true, redeemedAt: { gte: from, lt: to } } });
   }
 
-  async distinctUsersForBusiness(businessId: string) {
-  const rows: Array<{ userId: string }> = await prisma.stamp.findMany({ where: { businessId }, select: { userId: true }, distinct: ['userId'] });
-  const coup: Array<{ userId: string }> = await prisma.coupon.findMany({ where: { businessId }, select: { userId: true }, distinct: ['userId'] });
+  async countTotalCouponsRedeemed(businessId: string | string[]) {
+    return prisma.coupon.count({ where: { businessId: this.bizWhere(businessId), isRedeemed: true } });
+  }
+
+  async distinctUsersForBusiness(businessId: string | string[]) {
+  const rows: Array<{ userId: string }> = await prisma.stamp.findMany({ where: { businessId: this.bizWhere(businessId) }, select: { userId: true }, distinct: ['userId'] });
+  const coup: Array<{ userId: string }> = await prisma.coupon.findMany({ where: { businessId: this.bizWhere(businessId) }, select: { userId: true }, distinct: ['userId'] });
   const set = new Set<string>();
   rows.forEach((r: { userId: string }) => set.add(r.userId));
   coup.forEach((r: { userId: string }) => set.add(r.userId));
     return set.size;
   }
 
-  async countNewUsersSince(businessId: string, since: Date) {
+  async countNewUsersSince(businessId: string | string[], since: Date) {
     // Approximation: count distinct users who got any stamp since the date
     const rows: Array<{ userId: string }> = await prisma.stamp.findMany({
-      where: { businessId, createdAt: { gte: since } },
+      where: { businessId: this.bizWhere(businessId), createdAt: { gte: since } },
       select: { userId: true },
       distinct: ['userId']
     });
@@ -184,13 +244,14 @@ export class RepositoryPrisma {
     return dates;
   }
 
-  async getDailyStamps(businessId: string, startDate: Date, endDate: Date = new Date()) {
+  async getDailyStamps(businessId: string | string[], startDate: Date, endDate: Date = new Date()) {
+    const ids = this.bizArray(businessId);
     // Group stamps per UTC date between startDate..endDate inclusive
     const result: Array<{ date: string; count: number }> = await prisma.$queryRaw`\
       SELECT TO_CHAR(("createdAt" AT TIME ZONE 'UTC')::date, 'YYYY-MM-DD') AS date,\
              COUNT(*)::int AS count\
       FROM "Stamp"\
-      WHERE "businessId" = ${businessId}\
+      WHERE "businessId" = ANY(${ids})\
         AND "createdAt" >= ${startDate}\
         AND "createdAt" < ${new Date(Date.UTC(endDate.getUTCFullYear(), endDate.getUTCMonth(), endDate.getUTCDate() + 1))}\
       GROUP BY 1\
@@ -201,7 +262,8 @@ export class RepositoryPrisma {
     return days.map(d => map.get(d.toISOString().slice(0, 10)) || 0);
   }
 
-  async getDailyTransactionsSessions(businessId: string, startDate: Date, endDate: Date = new Date()) {
+  async getDailyTransactionsSessions(businessId: string | string[], startDate: Date, endDate: Date = new Date()) {
+    const ids = this.bizArray(businessId);
     // Count "sessions" per user per day (>=10 minutes gap starts a new session)
     const endExclusive = new Date(Date.UTC(endDate.getUTCFullYear(), endDate.getUTCMonth(), endDate.getUTCDate() + 1));
     const result: Array<{ date: string; count: number }> = await prisma.$queryRaw`\
@@ -211,7 +273,7 @@ export class RepositoryPrisma {
           ("createdAt" AT TIME ZONE 'UTC')::date        AS day_utc,\
           "userId"\
         FROM "Stamp"\
-        WHERE "businessId" = ${businessId}\
+        WHERE "businessId" = ANY(${ids})\
           AND "userId" IS NOT NULL\
           AND "createdAt" >= ${startDate}\
           AND "createdAt" < ${endExclusive}\
@@ -239,21 +301,21 @@ export class RepositoryPrisma {
   }
 
   // Advanced metrics inspired by brand backend
-  async calculateReturnacyRate(businessId: string, days: number = 30) {
+  async calculateReturnacyRate(businessId: string | string[], days: number = 30) {
+    const ids = this.bizArray(businessId);
     const since = new Date(Date.now() - 1000 * 60 * 60 * 24 * days);
     const prevWindowStart = new Date(since.getTime() - 1000 * 60 * 60 * 24 * 30);
     const rows: Array<{ c: number }> = await prisma.$queryRaw`\
       WITH purchases AS (\
-        SELECT DISTINCT "userId", "businessId", date_trunc('second', "createdAt") AS ts\
+        SELECT DISTINCT "userId", date_trunc('second', "createdAt") AS ts\
         FROM "Stamp"\
-        WHERE "businessId" = ${businessId}\
+        WHERE "businessId" = ANY(${ids})\
           AND "createdAt" >= ${prevWindowStart}\
       )\
       SELECT COUNT(DISTINCT a."userId")::int AS c\
       FROM purchases a\
       JOIN purchases b\
         ON b."userId" = a."userId"\
-       AND b."businessId" = a."businessId"\
        AND b.ts < a.ts\
        AND b.ts >= a.ts - INTERVAL '30 days'\
       WHERE a.ts >= ${since}\
@@ -261,13 +323,14 @@ export class RepositoryPrisma {
     return rows[0]?.c ?? 0;
   }
 
-  async calculateAverageUserFrequency(businessId: string, days: number = 30) {
+  async calculateAverageUserFrequency(businessId: string | string[], days: number = 30) {
+    const ids = this.bizArray(businessId);
     const since = new Date(Date.now() - 1000 * 60 * 60 * 24 * days);
     const result: Array<{ avg_days: number | null }> = await prisma.$queryRaw`\
       WITH recent_stamps AS (\
         SELECT "userId", DATE("createdAt") AS day\
         FROM "Stamp"\
-        WHERE "businessId" = ${businessId}\
+        WHERE "businessId" = ANY(${ids})\
           AND "createdAt" >= ${since}\
         GROUP BY "userId", DATE("createdAt")\
       ),\
@@ -302,7 +365,8 @@ export class RepositoryPrisma {
 
   // CRM Users list - this relies on an external user-service normally. For now, return an empty list placeholder.
   // Extend later if a local mirror exists. Here we only provide stamp/coupon counts enrichment API.
-  async getUsersStatsForBusiness(userIds: string[], businessId: string) {
+  async getUsersStatsForBusiness(userIds: string[], businessId: string | string[]) {
+    const bizFilter = this.bizWhere(businessId);
     const normalizedIds = Array.from(
       new Set(
         userIds
@@ -325,25 +389,25 @@ export class RepositoryPrisma {
     const [stampTotals, validStampTotals, couponTotals, activeCoupons] = await Promise.all([
       prisma.stamp.groupBy({
         by: ['userId'],
-        where: { businessId, userId: { in: normalizedIds } },
+        where: { businessId: bizFilter, userId: { in: normalizedIds } },
         _count: { _all: true },
         _max: { createdAt: true },
       }),
       prisma.stamp.groupBy({
         by: ['userId'],
-        where: { businessId, userId: { in: normalizedIds }, isRedeemed: false },
+        where: { businessId: bizFilter, userId: { in: normalizedIds }, isRedeemed: false },
         _count: { _all: true },
       }),
       prisma.coupon.groupBy({
         by: ['userId'],
-        where: { businessId, userId: { in: normalizedIds } },
+        where: { businessId: bizFilter, userId: { in: normalizedIds } },
         _count: { _all: true },
         _max: { createdAt: true },
       }),
       prisma.coupon.groupBy({
         by: ['userId'],
         where: {
-          businessId,
+          businessId: bizFilter,
           userId: { in: normalizedIds },
           isRedeemed: false,
           OR: [

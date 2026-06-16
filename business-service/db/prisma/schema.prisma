@@ -8,12 +8,21 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+enum WalletScope {
+  LOCATION
+  BRAND
+}
+
 model Brand {
   id        String   @id @default(uuid())
   name      String
   email     String   @unique
   phone     String   @unique
   address   String
+  // Whether the loyalty wallet (balance + prize progression) is scoped per
+  // location (LOCATION, default — franchise-safe) or shared across all of the
+  // brand's locations (BRAND — family-owned multi-location, e.g. Che Pizza).
+  walletScope WalletScope @default(LOCATION)
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
   totalSms   Int      @default(0)
@@ -30,8 +39,10 @@ model Business {
   id             String   @id @default(uuid())
   brandId        String
   name           String
-  email          String   @unique
-  phone          String   @unique
+  // Not unique: sibling locations of a family-owned brand legitimately share
+  // contact details (e.g. Che Pizza Taggi + Lissaro use the same email/phone).
+  email          String
+  phone          String
   address        String
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
@@ -81,6 +92,9 @@ model Coupon {
   createdAt  DateTime @default(now())
   expiredAt  DateTime?
   redeemedAt DateTime?
+  // Location where the coupon was redeemed (may differ from where it was earned,
+  // i.e. `businessId`, under a BRAND-scoped shared wallet).
+  redeemedBusinessId String?
   business   Business @relation(fields: [businessId], references: [id])
   prize      Prize    @relation(fields: [prizeId], references: [id])
   @@index([userId, businessId, prizeId])

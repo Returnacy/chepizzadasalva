@@ -6,6 +6,7 @@ import { getUser, addStamps as addStampsLegacy, getPrizeProgression, getUserCoup
 import { useToast } from '../hooks/use-toast';
 import { useLocation, Link } from 'wouter';
 import { ModeSelector } from '../features/scan/components/ModeSelector';
+import { StaffLocationGate } from '../features/scan/components/StaffLocationGate';
 import { CameraScannerCard } from '../features/scan/components/CameraScannerCard';
 import { ManualInput } from '../features/scan/components/ManualInput';
 import { CouponResult } from '../features/scan/components/CouponResult';
@@ -517,6 +518,9 @@ export default function ScanQRPage() {
 
   return (
     <div className="max-w-2xl mx-auto p-6 min-h-screen">
+      {/* Staff location gate (BRAND-scoped multi-location only): badge + daily picker */}
+      <StaffLocationGate />
+
       {/* Top actions */}
       <div className="flex items-center justify-between mb-6">
         {fromCRM && (

@@ -6,8 +6,18 @@ export function registerAnalyticsRoutes(app: FastifyInstance) {
   // GET /api/v1/analytics - core metrics
   app.get('/api/v1/analytics', async (request: any, reply: any) => {
     try {
-      const brandId = process.env.DEFAULT_BRAND_ID || '385d4ebb-4c4b-46e9-8701-0d71bfd7ce47';
-      const businessId = process.env.DEFAULT_BUSINESS_ID || 'af941888-ec4c-458e-b905-21673241af3e';
+      // Scope: brand-wide aggregate by default under a BRAND wallet, single
+      // location otherwise; `?businessId=` forces a per-location drill-down.
+      const scope = await app.repository.getWalletScope();
+      const brandId = app.repository.brandId;
+      const q = request.query || {};
+      const filterBusinessId = typeof q.businessId === 'string' && q.businessId ? q.businessId : null;
+      const bizSet: string | string[] = filterBusinessId
+        ? filterBusinessId
+        : (scope === 'BRAND' ? await app.repository.getBrandBusinessIds() : app.repository.businessId);
+      const userScope = filterBusinessId
+        ? { businessId: filterBusinessId }
+        : (scope === 'BRAND' ? { brandId } : { businessId: app.repository.businessId });
 
       // Basic metrics using business-service data we own (stamps/coupons)
       const now = new Date();
@@ -16,21 +26,21 @@ export function registerAnalyticsRoutes(app: FastifyInstance) {
       const startOfMonth = new Date(now);
       startOfMonth.setDate(now.getDate() - 30);
 
-      // Total customers from user-service: count users with membership for this business
+      // Total customers from user-service: count users with membership in scope
       const userServiceUrl = process.env.USER_SERVICE_URL || 'https://user.returnacy.app';
       const tokenService = TokenService.fromEnv();
       const userClient = new UserServiceClient({ baseUrl: userServiceUrl, tokenService });
-      const totalCustomers = await userClient.countUsersByBusiness(businessId);
+      const totalCustomers = await userClient.countUsers(userScope);
 
       const [weekTotalStamps, monthTotalStamps, monthTotalCouponsRedeemed, weekNewUsers, totalCouponsRedeemed, weekTotalCouponsRedeemed, averageUserFrequency, returnacyRate] = await Promise.all([
-        app.repository.countStampsInRange(businessId, startOfWeek, now),
-        app.repository.countStampsInRange(businessId, startOfMonth, now),
-        app.repository.countRedeemedCouponsInRange(businessId, startOfMonth, now),
-        userClient.countNewUsersSince(businessId, startOfWeek),
-        app.repository.countTotalCouponsRedeemed(businessId),
-        app.repository.countRedeemedCouponsInRange(businessId, startOfWeek, now),
-        app.repository.calculateAverageUserFrequency(businessId, 30),
-        app.repository.calculateReturnacyRate(businessId, 30),
+        app.repository.countStampsInRange(bizSet, startOfWeek, now),
+        app.repository.countStampsInRange(bizSet, startOfMonth, now),
+        app.repository.countRedeemedCouponsInRange(bizSet, startOfMonth, now),
+        userClient.countNewUsers(userScope, startOfWeek),
+        app.repository.countTotalCouponsRedeemed(bizSet),
+        app.repository.countRedeemedCouponsInRange(bizSet, startOfWeek, now),
+        app.repository.calculateAverageUserFrequency(bizSet, 30),
+        app.repository.calculateReturnacyRate(bizSet, 30),
       ]);
 
       const payload = {
@@ -55,10 +65,13 @@ export function registerAnalyticsRoutes(app: FastifyInstance) {
   // GET /api/v1/analytics/daily-transactions?days=N
   app.get('/api/v1/analytics/daily-transactions', async (request: any, reply: any) => {
     try {
-      const brandId = process.env.DEFAULT_BRAND_ID || '385d4ebb-4c4b-46e9-8701-0d71bfd7ce47';
-      const businessId = process.env.DEFAULT_BUSINESS_ID || 'af941888-ec4c-458e-b905-21673241af3e';
-
+      const scope = await app.repository.getWalletScope();
       const q = request.query || {};
+      const filterBusinessId = typeof q.businessId === 'string' && q.businessId ? q.businessId : null;
+      const bizSet: string | string[] = filterBusinessId
+        ? filterBusinessId
+        : (scope === 'BRAND' ? await app.repository.getBrandBusinessIds() : app.repository.businessId);
+
       const days = Math.min(90, Math.max(1, Number(q.days || 30)));
 
       // Align to UTC midnight and compute start date (inclusive)
@@ -68,8 +81,8 @@ export function registerAnalyticsRoutes(app: FastifyInstance) {
       const startDate = new Date(currentMidnight.getTime() - (days - 1) * 24 * 60 * 60 * 1000);
 
       const [dailyTransactions, dailyStamps] = await Promise.all([
-        app.repository.getDailyTransactionsSessions(businessId, startDate, currentMidnight),
-        app.repository.getDailyStamps(businessId, startDate, currentMidnight),
+        app.repository.getDailyTransactionsSessions(bizSet, startDate, currentMidnight),
+        app.repository.getDailyStamps(bizSet, startDate, currentMidnight),
       ]);
 
       return reply.send({ message: 'ok', data: { dailyTransactions, dailyStamps } });
