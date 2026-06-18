@@ -523,11 +523,15 @@ export async function getCouponByCode(code: string): Promise<CouponType | null> 
   }
 }
 
-export async function redeemCoupon(couponId: string | number): Promise<{ success: boolean }> {
+export async function redeemCoupon(couponId: string | number, opts?: { override?: boolean }): Promise<{ success: boolean }> {
   try {
     // Pass the staff's current location so the redemption is attributed to where
     // it happened (may differ from where the coupon was earned under a shared wallet).
-    await businessHttp.patch(`/api/v1/coupons/${encodeURIComponent(String(couponId))}/redeem`, { businessId: getBusinessId() });
+    // `override` honors an expired coupon despite the server-side block (manager goodwill).
+    await businessHttp.patch(`/api/v1/coupons/${encodeURIComponent(String(couponId))}/redeem`, {
+      businessId: getBusinessId(),
+      override: opts?.override === true ? true : undefined,
+    });
     return { success: true };
   } catch (error) {
     throw normalizeError(error);

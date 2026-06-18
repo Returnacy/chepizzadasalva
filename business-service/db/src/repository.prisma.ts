@@ -142,6 +142,9 @@ export class RepositoryPrisma {
     const defaultExpiry = expiredAt ?? new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
     return prisma.coupon.create({ data: { userId, businessId, prizeId, code, expiredAt: defaultExpiry }, include: { prize: true } });
   }
+  async getCouponById(couponId: string) {
+    return prisma.coupon.findUnique({ where: { id: couponId }, include: { prize: true } });
+  }
   async findCouponByCode(code: string, businessId: string) {
     // Code is globally unique; scoping by the wallet filter lets a BRAND-scoped
     // coupon be found (and redeemed) at any of the brand's locations, while

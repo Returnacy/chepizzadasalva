@@ -44,13 +44,36 @@ export function registerCouponsRoutes(app: FastifyInstance) {
     return { coupon: serializeCoupon(coupon) };
   });
 
-  app.patch('/api/v1/coupons/:id/redeem', async (request: any) => {
+  app.patch('/api/v1/coupons/:id/redeem', async (request: any, reply: any) => {
     const { id } = request.params as { id: string };
+    const body = (request.body as any) ?? {};
     // Optional: location where the coupon is being redeemed (may differ from where
     // it was earned under a shared brand wallet). Best-effort attribution.
-    const redeemedBusinessId = (request.body as any)?.businessId
-      ? String((request.body as any).businessId)
-      : null;
+    const redeemedBusinessId = body.businessId ? String(body.businessId) : null;
+    // Manager override: honor an expired coupon despite the block (goodwill).
+    const override = body.override === true;
+
+    // Integrity gate: a coupon must exist, be unredeemed, and unexpired (unless
+    // overridden). Previously redeem updated by id blindly, which let the staff
+    // scanner's no-expiry shortcut redeem long-expired coupons.
+    const existing = await app.repository.getCouponById(id);
+    if (!existing) {
+      return reply.code(404).send({ error: 'COUPON_NOT_FOUND', message: 'Coupon not found' });
+    }
+    if (existing.isRedeemed) {
+      return reply.code(409).send({ error: 'ALREADY_REDEEMED', message: 'Coupon already redeemed' });
+    }
+    const isExpired = !!existing.expiredAt && new Date(existing.expiredAt).getTime() < Date.now();
+    if (isExpired && !override) {
+      return reply.code(409).send({ error: 'COUPON_EXPIRED', message: 'Coupon expired', expiredAt: existing.expiredAt });
+    }
+    if (isExpired && override) {
+      app.log.warn(
+        { couponId: id, code: existing.code, expiredAt: existing.expiredAt, redeemedBusinessId },
+        '[business-service] expired coupon redeemed via manager override',
+      );
+    }
+
     const coupon = await app.repository.redeemCoupon(id, redeemedBusinessId);
 
     try {

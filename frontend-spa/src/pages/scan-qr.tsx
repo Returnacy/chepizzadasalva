@@ -13,6 +13,9 @@ import { CouponResult } from '../features/scan/components/CouponResult';
 import { UserResult } from '../features/scan/components/UserResult';
 import { Button } from '../components/ui/button';
 import type { CouponType } from '../types/coupon';
+import { isCouponActive } from '../lib/coupons';
+import { useAuth } from '../hooks/use-auth';
+import { getRolesForContext } from '../lib/authz';
 
 const DEFAULT_CYCLE_SIZE = 15;
 
@@ -112,6 +115,9 @@ export default function ScanQRPage() {
   const [fromCRM, setFromCRM] = useState(false);
   const { toast } = useToast();
   const queryClient = useQueryClient();
+  const { user } = useAuth();
+  // Honoring an expired coupon is a manager-level override.
+  const isManager = getRolesForContext(user as any).some((r) => r === 'manager' || r === 'admin');
 
   // Extract query params (supports legacy serialized object)
   const [userIdParam, setUserIdParam] = useState(null as string | null);
@@ -194,7 +200,10 @@ export default function ScanQRPage() {
       try {
         const coupons = await getUserCoupons(userIdForProgress);
         if (cancelled) return;
-        const firstValid = (coupons ?? []).find((c: any) => c && c.code && !c.isRedeemed);
+        // Only surface coupons the customer can actually use (unredeemed AND
+        // unexpired) — same rule as customer.tsx, so staff don't see/redeem a
+        // coupon that's expired and hidden from the customer.
+        const firstValid = (coupons ?? []).find((c: any) => c && c.code && isCouponActive(c));
         setFirstValidCouponCode(firstValid ? String(firstValid.code) : null);
       } catch {
         if (cancelled) return;
@@ -347,12 +356,12 @@ export default function ScanQRPage() {
   });
 
   const redeemCouponMutation = useMutation({
-    mutationFn: async (coupon: CouponType) => {
+    mutationFn: async ({ coupon, override }: { coupon: CouponType; override?: boolean }) => {
       const targetId = coupon?.id ?? null;
       if (!targetId) {
         throw new Error('Impossibile riscattare il coupon senza un identificativo valido.');
       }
-      await redeemCouponLegacy(targetId);
+      await redeemCouponLegacy(targetId, { override });
       return { code: coupon.code ?? coupon.qrCode ?? String(targetId), isRedeemed: true, redeemedAt: new Date().toISOString() };
     },
     onSuccess: (redeemedCoupon: { code: string; isRedeemed: boolean; redeemedAt?: string }) => {
@@ -371,10 +380,35 @@ export default function ScanQRPage() {
         description: "Il coupon è stato utilizzato con successo. Buon appetito! 🍕",
       });
     },
-  onError: (error: any) => {
+  onError: (error: any, variables: { coupon: CouponType; override?: boolean }) => {
+      const code = error?.body?.error ?? null;
+
+      // Already redeemed — never overridable.
+      if (code === 'ALREADY_REDEEMED') {
+        toast({ title: 'Coupon già utilizzato', description: 'Questo coupon è già stato riscattato.', variant: 'destructive' });
+        return;
+      }
+
+      // Expired — block by default; a manager can explicitly honor it.
+      if (code === 'COUPON_EXPIRED' && !variables?.override) {
+        const expDate = error?.body?.expiredAt ? new Date(error.body.expiredAt).toLocaleDateString('it-IT') : null;
+        if (!isManager) {
+          toast({
+            title: 'Coupon scaduto',
+            description: `Coupon scaduto${expDate ? ` il ${expDate}` : ''}. Chiedi a un responsabile per convalidarlo.`,
+            variant: 'destructive',
+          });
+          return;
+        }
+        const ok = window.confirm(`Coupon scaduto${expDate ? ` il ${expDate}` : ''}. Convalidare comunque?`);
+        if (ok) {
+          redeemCouponMutation.mutate({ coupon: variables.coupon, override: true });
+        }
+        return;
+      }
+
       const errorMessage = error?.message || "Errore durante il riscatto del coupon.";
       const requiresEmailVerification = error?.requiresEmailVerification;
-      
       toast({
         title: requiresEmailVerification ? "Verifica Email Richiesta" : "Errore nel riscatto",
         description: errorMessage,
@@ -393,7 +427,7 @@ export default function ScanQRPage() {
       });
       return;
     }
-    redeemCouponMutation.mutate(scannedCoupon);
+    redeemCouponMutation.mutate({ coupon: scannedCoupon, override: false });
   };
 
   const handleScan = async (qrCode?: string) => {
