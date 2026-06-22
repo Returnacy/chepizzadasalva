@@ -467,4 +467,212 @@ export class RepositoryPrisma {
       lastVisit: null,
     };
   }
+
+  // ===========================================================================
+  // Multi-location analytics (read-only; powers the per-location dashboards).
+  // Everything below queries only the brand's existing locations and existing
+  // columns — no schema changes. Ranges are half-open [from, to).
+  // ===========================================================================
+
+  // Stamps created in range, grouped by location.
+  async stampsByLocation(from: Date, to: Date): Promise<Map<string, number>> {
+    const ids = await this.getBrandBusinessIds();
+    const rows = await prisma.stamp.groupBy({
+      by: ['businessId'],
+      where: { businessId: { in: ids }, createdAt: { gte: from, lt: to } },
+      _count: { _all: true },
+    });
+    return new Map(rows.map((r): [string, number] => [r.businessId, r._count?._all ?? 0]));
+  }
+
+  // Coupons redeemed in range, grouped by the location they were earned at.
+  async redeemedCouponsByLocation(from: Date, to: Date): Promise<Map<string, number>> {
+    const ids = await this.getBrandBusinessIds();
+    const rows = await prisma.coupon.groupBy({
+      by: ['businessId'],
+      where: { businessId: { in: ids }, isRedeemed: true, redeemedAt: { gte: from, lt: to } },
+      _count: { _all: true },
+    });
+    return new Map(rows.map((r): [string, number] => [r.businessId, r._count?._all ?? 0]));
+  }
+
+  // Distinct customers who got at least one stamp in range, grouped by location.
+  async activeCustomersByLocation(from: Date, to: Date): Promise<Map<string, number>> {
+    const ids = await this.getBrandBusinessIds();
+    const rows: Array<{ businessId: string; count: number }> = await prisma.$queryRaw`
+      SELECT "businessId", COUNT(DISTINCT "userId")::int AS count
+      FROM "Stamp"
+      WHERE "businessId" = ANY(${ids}) AND "createdAt" >= ${from} AND "createdAt" < ${to}
+      GROUP BY "businessId"
+    `;
+    return new Map(rows.map((r): [string, number] => [r.businessId, Number(r.count)]));
+  }
+
+  // New customers acquired in range, attributed to the location of their FIRST
+  // ever stamp. This is the honest per-location acquisition signal: customer
+  // registration carries a single shared host id, but the first stamp records
+  // the physical pizzeria that brought the customer in.
+  async firstStampAcquisitionByLocation(from: Date, to: Date): Promise<Map<string, number>> {
+    const ids = await this.getBrandBusinessIds();
+    const rows: Array<{ businessId: string; count: number }> = await prisma.$queryRaw`
+      WITH firsts AS (
+        SELECT "userId",
+               (ARRAY_AGG("businessId" ORDER BY "createdAt" ASC))[1] AS first_business,
+               MIN("createdAt") AS first_at
+        FROM "Stamp"
+        WHERE "userId" IS NOT NULL AND "businessId" = ANY(${ids})
+        GROUP BY "userId"
+      )
+      SELECT first_business AS "businessId", COUNT(*)::int AS count
+      FROM firsts
+      WHERE first_at >= ${from} AND first_at < ${to}
+      GROUP BY first_business
+    `;
+    return new Map(rows.map((r): [string, number] => [r.businessId, Number(r.count)]));
+  }
+
+  // Headline per-location metrics for the comparison view and the KPI strip.
+  // Includes every brand location (zero-filled when no activity).
+  async metricsByLocation(from: Date, to: Date) {
+    const [locations, stamps, redeemed, acquired, active] = await Promise.all([
+      this.listBrandLocations(),
+      this.stampsByLocation(from, to),
+      this.redeemedCouponsByLocation(from, to),
+      this.firstStampAcquisitionByLocation(from, to),
+      this.activeCustomersByLocation(from, to),
+    ]);
+    return locations.map(l => ({
+      businessId: l.id,
+      name: l.name,
+      stamps: stamps.get(l.id) ?? 0,
+      couponsRedeemed: redeemed.get(l.id) ?? 0,
+      newCustomers: acquired.get(l.id) ?? 0,
+      activeCustomers: active.get(l.id) ?? 0,
+    }));
+  }
+
+  // Daily stamp counts per location since startDate (UTC days), for the
+  // per-location stacked chart on the owner dashboard.
+  async dailyStampsByLocation(startDate: Date): Promise<Array<{ date: string; businessId: string; count: number }>> {
+    const ids = await this.getBrandBusinessIds();
+    const rows: Array<{ date: string; businessId: string; count: number }> = await prisma.$queryRaw`
+      SELECT TO_CHAR(("createdAt" AT TIME ZONE 'UTC')::date, 'YYYY-MM-DD') AS date,
+             "businessId", COUNT(*)::int AS count
+      FROM "Stamp"
+      WHERE "businessId" = ANY(${ids}) AND "createdAt" >= ${startDate}
+      GROUP BY 1, 2
+      ORDER BY 1
+    `;
+    return rows.map(r => ({ date: r.date, businessId: r.businessId, count: Number(r.count) }));
+  }
+
+  // Daily new-customer acquisition per location (by first-stamp date) since
+  // startDate, for the acquisition chart.
+  async acquisitionDailyByLocation(startDate: Date): Promise<Array<{ date: string; businessId: string; count: number }>> {
+    const ids = await this.getBrandBusinessIds();
+    const rows: Array<{ date: string; businessId: string; count: number }> = await prisma.$queryRaw`
+      WITH firsts AS (
+        SELECT "userId",
+               (ARRAY_AGG("businessId" ORDER BY "createdAt" ASC))[1] AS first_business,
+               MIN("createdAt") AS first_at
+        FROM "Stamp"
+        WHERE "userId" IS NOT NULL AND "businessId" = ANY(${ids})
+        GROUP BY "userId"
+      )
+      SELECT TO_CHAR((first_at AT TIME ZONE 'UTC')::date, 'YYYY-MM-DD') AS date,
+             first_business AS "businessId", COUNT(*)::int AS count
+      FROM firsts
+      WHERE first_at >= ${startDate}
+      GROUP BY 1, 2
+      ORDER BY 1
+    `;
+    return rows.map(r => ({ date: r.date, businessId: r.businessId, count: Number(r.count) }));
+  }
+
+  // Cross-location wallet flow: coupons redeemed in range, grouped by where they
+  // were earned vs. where they were redeemed. Older redemptions predate the
+  // redeemedBusinessId column, so they fall back to the earning location.
+  async crossLocationRedemptions(from: Date, to: Date): Promise<Array<{ earnedBusinessId: string; redeemedBusinessId: string; count: number }>> {
+    const ids = await this.getBrandBusinessIds();
+    const rows: Array<{ earned: string; redeemed: string; count: number }> = await prisma.$queryRaw`
+      SELECT "businessId" AS earned,
+             COALESCE("redeemedBusinessId", "businessId") AS redeemed,
+             COUNT(*)::int AS count
+      FROM "Coupon"
+      WHERE "isRedeemed" = true AND "redeemedAt" >= ${from} AND "redeemedAt" < ${to}
+        AND "businessId" = ANY(${ids})
+      GROUP BY 1, 2
+    `;
+    return rows.map(r => ({ earnedBusinessId: r.earned, redeemedBusinessId: r.redeemed, count: Number(r.count) }));
+  }
+
+  // Per-location retention buckets by each customer's most recent stamp at that
+  // location: active (<= days), at-risk (days..2*days), lost (> 2*days).
+  async retentionByLocation(days: number = 30): Promise<Array<{ businessId: string; total: number; active: number; atRisk: number; lost: number }>> {
+    const ids = await this.getBrandBusinessIds();
+    const activeSince = new Date(Date.now() - days * 24 * 60 * 60 * 1000);
+    const riskSince = new Date(Date.now() - 2 * days * 24 * 60 * 60 * 1000);
+    const rows: Array<{ businessId: string; total: number; active: number; at_risk: number; lost: number }> = await prisma.$queryRaw`
+      WITH last_per AS (
+        SELECT "userId", "businessId", MAX("createdAt") AS last_at
+        FROM "Stamp"
+        WHERE "businessId" = ANY(${ids})
+        GROUP BY "userId", "businessId"
+      )
+      SELECT "businessId",
+             COUNT(*)::int AS total,
+             COUNT(*) FILTER (WHERE last_at >= ${activeSince})::int AS active,
+             COUNT(*) FILTER (WHERE last_at < ${activeSince} AND last_at >= ${riskSince})::int AS at_risk,
+             COUNT(*) FILTER (WHERE last_at < ${riskSince})::int AS lost
+      FROM last_per
+      GROUP BY "businessId"
+    `;
+    return rows.map(r => ({ businessId: r.businessId, total: Number(r.total), active: Number(r.active), atRisk: Number(r.at_risk), lost: Number(r.lost) }));
+  }
+
+  // Reward funnel per location: stamps issued -> coupons earned -> redeemed,
+  // plus coupons that expired unredeemed, all within range.
+  async rewardFunnel(from: Date, to: Date) {
+    const ids = await this.getBrandBusinessIds();
+    const couponRows: Array<{ businessId: string; earned: number; redeemed: number; expired: number }> = await prisma.$queryRaw`
+      SELECT "businessId",
+             COUNT(*) FILTER (WHERE "createdAt" >= ${from} AND "createdAt" < ${to})::int AS earned,
+             COUNT(*) FILTER (WHERE "isRedeemed" = true AND "redeemedAt" >= ${from} AND "redeemedAt" < ${to})::int AS redeemed,
+             COUNT(*) FILTER (WHERE "isRedeemed" = false AND "expiredAt" IS NOT NULL AND "expiredAt" >= ${from} AND "expiredAt" < ${to})::int AS expired
+      FROM "Coupon"
+      WHERE "businessId" = ANY(${ids})
+      GROUP BY "businessId"
+    `;
+    const couponMap = new Map(couponRows.map((c): [string, typeof c] => [c.businessId, c]));
+    const [locations, stamps] = await Promise.all([
+      this.listBrandLocations(),
+      this.stampsByLocation(from, to),
+    ]);
+    return locations.map(l => {
+      const c = couponMap.get(l.id);
+      return {
+        businessId: l.id,
+        name: l.name,
+        stamps: stamps.get(l.id) ?? 0,
+        earned: Number(c?.earned ?? 0),
+        redeemed: Number(c?.redeemed ?? 0),
+        expired: Number(c?.expired ?? 0),
+      };
+    });
+  }
+
+  // Stamp activity by weekday (ISO 1=Mon..7=Sun) and hour, in Europe/Rome local
+  // time so the heatmap reflects real opening hours. Optionally one location.
+  async stampHeatmap(from: Date, to: Date, businessId?: string | null): Promise<Array<{ dow: number; hour: number; count: number }>> {
+    const ids = businessId ? [businessId] : await this.getBrandBusinessIds();
+    const rows: Array<{ dow: number; hour: number; count: number }> = await prisma.$queryRaw`
+      SELECT EXTRACT(ISODOW FROM ("createdAt" AT TIME ZONE 'UTC' AT TIME ZONE 'Europe/Rome'))::int AS dow,
+             EXTRACT(HOUR FROM ("createdAt" AT TIME ZONE 'UTC' AT TIME ZONE 'Europe/Rome'))::int AS hour,
+             COUNT(*)::int AS count
+      FROM "Stamp"
+      WHERE "businessId" = ANY(${ids}) AND "createdAt" >= ${from} AND "createdAt" < ${to}
+      GROUP BY 1, 2
+    `;
+    return rows.map(r => ({ dow: Number(r.dow), hour: Number(r.hour), count: Number(r.count) }));
+  }
 }

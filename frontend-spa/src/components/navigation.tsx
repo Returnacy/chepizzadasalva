@@ -10,6 +10,7 @@ import {
   Users,
   Activity,
   Target,
+  MapPin,
 } from "lucide-react";
 import { useAuth } from "../hooks/use-auth";
 import { authorizer } from "../lib/policy";
@@ -48,6 +49,12 @@ export function Navigation() {
       label: "Dashboard Proprietario",
       icon: BarChart3,
       resource: 'nav', action: 'dashboard',
+    },
+    {
+      path: "/location-insights",
+      label: "Analisi Sedi",
+      icon: MapPin,
+      resource: 'nav', action: 'insights',
     },
     {
       path: "/crm",

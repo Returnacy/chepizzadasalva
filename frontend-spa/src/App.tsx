@@ -16,6 +16,7 @@ import ResetPasswordPage from "./pages/reset-password";
 import VerifyEmailPage from "./pages/verify-email";
 import CRMPage from "./pages/crm";
 import MarketingAutomationsPage from "./pages/marketing-automations";
+import LocationInsightsPage from "./pages/location-insights";
 import KPIDashboard from "./pages/kpi-dashboard";
 import NotFound from "./pages/not-found";
 import TermsConsentDialog from "./components/TermsConsentDialog";
@@ -55,9 +56,14 @@ function Router() {
       />
 
       {/* Admin-only routes */}
-      <ProtectedRoute 
-        path="/dashboard" 
-        component={DashboardPage} 
+      <ProtectedRoute
+        path="/dashboard"
+        component={DashboardPage}
+        allowedRoles={["manager", "brand_manager", "admin"]}
+      />
+      <ProtectedRoute
+        path="/location-insights"
+        component={LocationInsightsPage}
         allowedRoles={["manager", "brand_manager", "admin"]}
       />
       <ProtectedRoute 

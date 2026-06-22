@@ -7,6 +7,7 @@ export const policy: Record<string, Record<string, Role>> = {
     customer: 'user',
     scanQr: 'staff',
     dashboard: 'manager',
+    insights: 'manager',
     crm: 'manager',
     marketing: 'manager',
     kpi: 'admin',

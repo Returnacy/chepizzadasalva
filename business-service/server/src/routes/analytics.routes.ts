@@ -91,4 +91,136 @@ export function registerAnalyticsRoutes(app: FastifyInstance) {
       return reply.code(500).send({ message: 'Failed to fetch daily transactions' });
     }
   });
+
+  // --- Multi-location analytics (per-location dashboards) -------------------
+  const parseDays = (q: any, def = 30, max = 365): number => {
+    const n = Number(q?.days ?? def);
+    return Math.min(max, Math.max(1, Number.isFinite(n) ? Math.trunc(n) : def));
+  };
+  const rangeFromDays = (days: number): { from: Date; to: Date } => {
+    const to = new Date();
+    const from = new Date(to.getTime() - days * 24 * 60 * 60 * 1000);
+    return { from, to };
+  };
+  const startMidnightUTC = (days: number): Date => {
+    const m = new Date();
+    m.setUTCHours(0, 0, 0, 0);
+    return new Date(m.getTime() - (days - 1) * 24 * 60 * 60 * 1000);
+  };
+  const locationRefs = (locations: any[]) => locations.map((l: any) => ({ id: l.id, name: l.name }));
+
+  // Brand locations — powers the dashboard location switcher.
+  app.get('/api/v1/analytics/locations', async (_request: any, reply: any) => {
+    try {
+      const locations = await app.repository.listBrandLocations();
+      return reply.send({ message: 'ok', data: locationRefs(locations) });
+    } catch (e: any) {
+      app.log.error(e);
+      return reply.code(500).send({ message: 'Failed to fetch locations' });
+    }
+  });
+
+  // Per-location headline metrics — KPI strip + comparison view.
+  app.get('/api/v1/analytics/by-location', async (request: any, reply: any) => {
+    try {
+      const { from, to } = rangeFromDays(parseDays(request.query));
+      const data = await app.repository.metricsByLocation(from, to);
+      return reply.send({ message: 'ok', data });
+    } catch (e: any) {
+      app.log.error(e);
+      return reply.code(500).send({ message: 'Failed to fetch by-location analytics' });
+    }
+  });
+
+  // Daily stamps per location — owner dashboard stacked chart.
+  app.get('/api/v1/analytics/daily-by-location', async (request: any, reply: any) => {
+    try {
+      const days = parseDays(request.query);
+      const [rows, locations] = await Promise.all([
+        app.repository.dailyStampsByLocation(startMidnightUTC(days)),
+        app.repository.listBrandLocations(),
+      ]);
+      return reply.send({ message: 'ok', data: { rows, locations: locationRefs(locations) } });
+    } catch (e: any) {
+      app.log.error(e);
+      return reply.code(500).send({ message: 'Failed to fetch daily-by-location analytics' });
+    }
+  });
+
+  // New-customer acquisition per location (by first-stamp) — daily series.
+  app.get('/api/v1/analytics/acquisition', async (request: any, reply: any) => {
+    try {
+      const days = parseDays(request.query);
+      const [rows, locations] = await Promise.all([
+        app.repository.acquisitionDailyByLocation(startMidnightUTC(days)),
+        app.repository.listBrandLocations(),
+      ]);
+      return reply.send({ message: 'ok', data: { rows, locations: locationRefs(locations) } });
+    } catch (e: any) {
+      app.log.error(e);
+      return reply.code(500).send({ message: 'Failed to fetch acquisition analytics' });
+    }
+  });
+
+  // Cross-location wallet flow — earned-at vs. redeemed-at matrix.
+  app.get('/api/v1/analytics/cross-location', async (request: any, reply: any) => {
+    try {
+      const { from, to } = rangeFromDays(parseDays(request.query));
+      const [matrix, locations] = await Promise.all([
+        app.repository.crossLocationRedemptions(from, to),
+        app.repository.listBrandLocations(),
+      ]);
+      return reply.send({ message: 'ok', data: { matrix, locations: locationRefs(locations) } });
+    } catch (e: any) {
+      app.log.error(e);
+      return reply.code(500).send({ message: 'Failed to fetch cross-location analytics' });
+    }
+  });
+
+  // Per-location retention buckets (active / at-risk / lost).
+  app.get('/api/v1/analytics/retention', async (request: any, reply: any) => {
+    try {
+      const days = parseDays(request.query);
+      const [rows, locations] = await Promise.all([
+        app.repository.retentionByLocation(days),
+        app.repository.listBrandLocations(),
+      ]);
+      const nameMap = new Map<string, string>(locations.map((l: any) => [l.id, l.name]));
+      const seen = new Set(rows.map((r: any) => r.businessId));
+      const data = rows.map((r: any) => ({ ...r, name: nameMap.get(r.businessId) ?? r.businessId }));
+      for (const l of locations) {
+        if (!seen.has(l.id)) data.push({ businessId: l.id, name: l.name, total: 0, active: 0, atRisk: 0, lost: 0 });
+      }
+      return reply.send({ message: 'ok', data });
+    } catch (e: any) {
+      app.log.error(e);
+      return reply.code(500).send({ message: 'Failed to fetch retention analytics' });
+    }
+  });
+
+  // Reward funnel per location (stamps -> earned -> redeemed -> expired).
+  app.get('/api/v1/analytics/reward-funnel', async (request: any, reply: any) => {
+    try {
+      const { from, to } = rangeFromDays(parseDays(request.query));
+      const data = await app.repository.rewardFunnel(from, to);
+      return reply.send({ message: 'ok', data });
+    } catch (e: any) {
+      app.log.error(e);
+      return reply.code(500).send({ message: 'Failed to fetch reward-funnel analytics' });
+    }
+  });
+
+  // Stamp activity heatmap by weekday x hour (Europe/Rome), optionally one location.
+  app.get('/api/v1/analytics/stamp-heatmap', async (request: any, reply: any) => {
+    try {
+      const q = request.query || {};
+      const businessId = typeof q.businessId === 'string' && q.businessId ? q.businessId : null;
+      const { from, to } = rangeFromDays(parseDays(q));
+      const data = await app.repository.stampHeatmap(from, to, businessId);
+      return reply.send({ message: 'ok', data });
+    } catch (e: any) {
+      app.log.error(e);
+      return reply.code(500).send({ message: 'Failed to fetch stamp-heatmap analytics' });
+    }
+  });
 }

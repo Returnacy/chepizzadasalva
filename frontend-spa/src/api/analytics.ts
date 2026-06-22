@@ -1,4 +1,4 @@
-import { businessHttp, getBusinessId } from '../lib/servicesHttp';
+import { businessHttp } from '../lib/servicesHttp';
 
 // ---- Types ----
 export interface AnalyticsEnvelope<T> { message: string; data: T }
@@ -56,14 +56,17 @@ export function toEconomic(dto: CoreAnalyticsDTO): EconomicMetrics {
 }
 
 // ---- API Calls ----
-export async function fetchCoreAnalytics() {
-  const businessId = getBusinessId();
-  const env = await businessHttp.get<AnalyticsEnvelope<CoreAnalyticsDTO>>(`/api/v1/analytics?businessId=${encodeURIComponent(businessId)}`);
+// `businessId` scopes to one location; omit it to get the brand-wide aggregate
+// (server sums across all of the brand's locations under a BRAND wallet).
+// `undefined` means "Tutte le sedi"; the explicit string selects one location.
+export async function fetchCoreAnalytics(businessId?: string) {
+  const q = businessId ? `?businessId=${encodeURIComponent(businessId)}` : '';
+  const env = await businessHttp.get<AnalyticsEnvelope<CoreAnalyticsDTO>>(`/api/v1/analytics${q}`);
   return env.data;
 }
 
-export async function fetchDailyTransactions(days: number) {
-  const businessId = getBusinessId();
-  const env = await businessHttp.get<AnalyticsEnvelope<DailyTransactionsDTO>>(`/api/v1/analytics/daily-transactions?days=${days}&businessId=${encodeURIComponent(businessId)}`);
+export async function fetchDailyTransactions(days: number, businessId?: string) {
+  const q = businessId ? `&businessId=${encodeURIComponent(businessId)}` : '';
+  const env = await businessHttp.get<AnalyticsEnvelope<DailyTransactionsDTO>>(`/api/v1/analytics/daily-transactions?days=${days}${q}`);
   return env.data;
 }

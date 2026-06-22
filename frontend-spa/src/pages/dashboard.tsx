@@ -1,14 +1,19 @@
 // Dashboard page refactored to modular feature components
 import { useState, useEffect } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import { Card, CardTitle, CardHeader, CardContent } from '../components/ui/card';
 import { Button } from '../components/ui/button';
-import { MessageCircle, Download } from 'lucide-react';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../components/ui/select';
+import { MessageCircle, Download, MapPin } from 'lucide-react';
 import { Dialog, DialogTrigger, DialogContent, DialogHeader, DialogTitle } from '../components/ui/dialog';
 import { OverviewCards } from '../features/analytics/components/OverviewCards';
 import { KPICards } from '../features/analytics/components/KPICards';
 import { PriceConfig } from '../features/analytics/components/PriceConfig';
 import { DailyTransactionsChart } from '../features/analytics/components/DailyTransactionsChart';
+import { LocationStrip } from '../features/analytics/components/LocationStrip';
+import { LocationStampsChart } from '../features/analytics/components/LocationStampsChart';
 import { useOverviewMetrics, useRepeatRateMetrics, useFrequencyMetrics, useEconomicMetrics, useDailyTransactions } from '../features/analytics/hooks';
+import { fetchLocations } from '../api/locationAnalytics';
 
 // Local interfaces kept for internal mapping (data now derived from two backend endpoints)
 // (Feedback & traffic placeholders retained until backend integration)
@@ -20,6 +25,14 @@ export default function DashboardPage() {
   const [isMobile, setIsMobile] = useState(false);
   const [showChartModal, setShowChartModal] = useState(false);
   const [mobileChartDays, setMobileChartDays] = useState("30");
+
+  // Location scope for the whole dashboard. 'all' => brand-wide aggregate
+  // (server sums every location); otherwise a single location id. Decoupled
+  // from the staff stamping picker so reporting no longer follows it silently.
+  const [locationId, setLocationId] = useState("all");
+  const businessId = locationId === "all" ? undefined : locationId;
+  const { data: locations = [] } = useQuery({ queryKey: ["analytics:locations"], queryFn: fetchLocations });
+  const multiLocation = locations.length > 1;
 
   // Detect mobile screen size
   useEffect(() => {
@@ -39,11 +52,12 @@ export default function DashboardPage() {
     }
   }, [isMobile]);
 
-  // Single analytics endpoint (backend: GET /api/analytics)
-  const overviewQuery = useOverviewMetrics();
-  const repeatRateQuery = useRepeatRateMetrics();
-  const frequencyQuery = useFrequencyMetrics();
-  const economicQuery = useEconomicMetrics();
+  // Single analytics endpoint (backend: GET /api/analytics), scoped to the
+  // selected location (or brand-wide when 'all').
+  const overviewQuery = useOverviewMetrics(businessId);
+  const repeatRateQuery = useRepeatRateMetrics(businessId);
+  const frequencyQuery = useFrequencyMetrics(businessId);
+  const economicQuery = useEconomicMetrics(businessId);
 
   // Helper for consistent 2-decimal formatting
   const format2 = (n: number | string | null | undefined) => {
@@ -53,8 +67,8 @@ export default function DashboardPage() {
   };
 
   // Daily stamps & transactions endpoint (backend: GET /api/analytics/daily-transactions?days=N )
-  const dailyDesktop = useDailyTransactions(parseInt(stampChartDays, 10) || 30, true);
-  const dailyMobile = useDailyTransactions(parseInt(mobileChartDays, 10) || 30, isMobile);
+  const dailyDesktop = useDailyTransactions(parseInt(stampChartDays, 10) || 30, true, businessId);
+  const dailyMobile = useDailyTransactions(parseInt(mobileChartDays, 10) || 30, isMobile, businessId);
 
   // Placeholder arrays for unsupported sections (traffic sources, nps distribution, feedback)
   const trafficSources: any[] = [];
@@ -247,14 +261,35 @@ export default function DashboardPage() {
   return (
     <div className="max-w-7xl mx-auto p-6">
       {/* Header */}
-      <div className="mb-8">
-        <h1 className="text-3xl font-bold text-gray-900 mb-2">
-          Owner Dashboard
-        </h1>
-        <p className="text-gray-600">Che Pizza Loyalty System Analytics</p>
+      <div className="mb-8 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+        <div>
+          <h1 className="text-3xl font-bold text-gray-900 mb-2">
+            Owner Dashboard
+          </h1>
+          <p className="text-gray-600">Che Pizza Loyalty System Analytics</p>
+        </div>
+        {multiLocation && (
+          <div className="flex items-center gap-2">
+            <MapPin className="w-4 h-4 text-gray-500" />
+            <Select value={locationId} onValueChange={setLocationId}>
+              <SelectTrigger className="w-56" aria-label="Seleziona sede">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Tutte le sedi</SelectItem>
+                {locations.map((loc) => (
+                  <SelectItem key={loc.id} value={loc.id}>{loc.name}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+        )}
       </div>
 
   {overviewQuery.data && <OverviewCards data={overviewQuery.data} />}
+
+  {/* Group A — per-location KPI strip (multi-location only) */}
+  {multiLocation && <LocationStrip days={30} />}
 
       {repeatRateQuery.data && frequencyQuery.data && economicQuery.data && overviewQuery.data && (
         <KPICards
@@ -295,6 +330,11 @@ export default function DashboardPage() {
         combinedDesktop={combinedStampData}
         combinedMobile={combinedMobileChartData}
       />
+
+      {/* Group A (A2) — daily stamps split per location (brand-aggregate view only) */}
+      {multiLocation && locationId === "all" && (
+        <LocationStampsChart days={parseInt(stampChartDays, 10) || 30} isMobile={isMobile} />
+      )}
 
       {/* Charts Row */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
