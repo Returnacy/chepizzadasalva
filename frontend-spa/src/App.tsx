@@ -72,7 +72,7 @@ function Router() {
       <ProtectedRoute
         path="/crm"
         component={CRMPage}
-        allowedRoles={["manager", "brand_manager", "admin"]}
+        allowedRoles={["staff", "manager", "brand_manager", "admin"]}
       />
       <ProtectedRoute
         path="/squadra"

@@ -8,7 +8,7 @@ export const policy: Record<string, Record<string, Role>> = {
     scanQr: 'staff',
     dashboard: 'manager',
     insights: 'manager',
-    crm: 'manager',
+    crm: 'staff',
     marketing: 'manager',
     team: 'brand_manager',
     kpi: 'admin',
@@ -21,7 +21,8 @@ export const policy: Record<string, Record<string, Role>> = {
   },
   crm: {
     addCustomer: 'staff',
-    deleteCustomer: 'manager',
+    // Was 'manager' before 2026-07-05; opened to 'staff' so STAFF has full CRM access.
+    deleteCustomer: 'staff',
     redeemCoupon: 'staff',
   },
 };
