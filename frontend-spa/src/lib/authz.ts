@@ -1,9 +1,12 @@
 import { getBusinessId } from './servicesHttp';
 import type { ClientType } from '../types/client';
 
-// Define the roles your app recognizes in ascending order of privilege
-export type Role = 'user' | 'staff' | 'manager' | 'admin' | string;
-const ROLE_ORDER: Role[] = ['user', 'staff', 'manager', 'admin'];
+// Define the roles your app recognizes in ascending order of privilege.
+// 'brand_manager' (lowercased BRAND_MANAGER) sits between manager and admin so
+// unknown-role handling in roleRank() ranks it correctly instead of flooring it
+// to 0 (which would let a plain manager clear a brand_manager-gated check).
+export type Role = 'user' | 'staff' | 'manager' | 'brand_manager' | 'admin' | string;
+const ROLE_ORDER: Role[] = ['user', 'staff', 'manager', 'brand_manager', 'admin'];
 
 export type TenantContext = { businessId?: string | null; brandId?: string | null };
 

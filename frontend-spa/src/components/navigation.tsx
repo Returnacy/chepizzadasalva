@@ -8,6 +8,7 @@ import {
   Menu,
   X,
   Users,
+  UserCog,
   Activity,
   Target,
   MapPin,
@@ -61,6 +62,12 @@ export function Navigation() {
       label: "CRM Clienti",
       icon: Users,
       resource: 'nav', action: 'crm',
+    },
+    {
+      path: "/squadra",
+      label: "Squadra",
+      icon: UserCog,
+      resource: 'nav', action: 'team',
     },
     {
       path: "/marketing-automations",

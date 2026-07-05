@@ -10,6 +10,7 @@ export const policy: Record<string, Record<string, Role>> = {
     insights: 'manager',
     crm: 'manager',
     marketing: 'manager',
+    team: 'brand_manager',
     kpi: 'admin',
   },
   campaigns: {

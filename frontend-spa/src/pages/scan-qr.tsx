@@ -7,6 +7,7 @@ import { useToast } from '../hooks/use-toast';
 import { useLocation, Link } from 'wouter';
 import { ModeSelector } from '../features/scan/components/ModeSelector';
 import { StaffLocationGate } from '../features/scan/components/StaffLocationGate';
+import { ChiusuraSerataCard } from '../features/scan/components/ChiusuraSerataCard';
 import { CameraScannerCard } from '../features/scan/components/CameraScannerCard';
 import { ManualInput } from '../features/scan/components/ManualInput';
 import { CouponResult } from '../features/scan/components/CouponResult';
@@ -554,6 +555,9 @@ export default function ScanQRPage() {
     <div className="max-w-2xl mx-auto p-6 min-h-screen">
       {/* Staff location gate (BRAND-scoped multi-location only): badge + daily picker */}
       <StaffLocationGate />
+
+      {/* Chiusura serata handoff (staff and up) */}
+      <ChiusuraSerataCard />
 
       {/* Top actions */}
       <div className="flex items-center justify-between mb-6">
