@@ -14,6 +14,7 @@ import { LocationStrip } from '../features/analytics/components/LocationStrip';
 import { LocationStampsChart } from '../features/analytics/components/LocationStampsChart';
 import { useOverviewMetrics, useRepeatRateMetrics, useFrequencyMetrics, useEconomicMetrics, useDailyTransactions } from '../features/analytics/hooks';
 import { fetchLocations } from '../api/locationAnalytics';
+import { ChiusuraSerataCard } from '../features/scan/components/ChiusuraSerataCard';
 
 // Local interfaces kept for internal mapping (data now derived from two backend endpoints)
 // (Feedback & traffic placeholders retained until backend integration)
@@ -285,6 +286,9 @@ export default function DashboardPage() {
           </div>
         )}
       </div>
+
+  {/* Chiusura serata handoff — full card for the owner (staff-and-up visibility) */}
+  <ChiusuraSerataCard variant="card" />
 
   {overviewQuery.data && <OverviewCards data={overviewQuery.data} />}
 

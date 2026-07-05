@@ -1,0 +1,1 @@
+{"version":3,"file":"userAuthPlugin.d.ts","sourceRoot":"","sources":["../../../src/plugins/userAuthPlugin.ts"],"names":[],"mappings":"AAGA,KAAK,UAAU,GAAG;IAChB,OAAO,EAAE,MAAM,GAAG,IAAI,CAAC;IACvB,UAAU,EAAE,MAAM,GAAG,IAAI,CAAC;IAC1B,KAAK,EAAE,MAAM,EAAE,CAAC;CACjB,CAAC;AAEF,OAAO,QAAQ,SAAS,CAAC;IACvB,UAAU,cAAc;QACtB,eAAe,CAAC,EAAE,UAAU,EAAE,CAAC;KAChC;CACF;;AAED,wBAqGG"}

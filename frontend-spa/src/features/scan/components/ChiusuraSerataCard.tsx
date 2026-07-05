@@ -21,7 +21,7 @@ type Loc = { id: string; name: string; address?: string };
 const ENV: any = (import.meta as any).env || {};
 const PM_URL: string = (ENV.VITE_PM_URL || 'https://statistich3.chepizzadasalva.it').replace(/\/$/, '');
 
-export function ChiusuraSerataCard() {
+export function ChiusuraSerataCard({ variant = 'card' }: { variant?: 'card' | 'compact' }) {
   const { user } = useAuth();
   const { toast } = useToast();
   const [pending, setPending] = useState(false);
@@ -77,27 +77,48 @@ export function ChiusuraSerataCard() {
 
   return (
     <>
-      <Card className="mb-6">
-        <CardHeader>
-          <CardTitle className="text-lg flex items-center gap-2">
-            <ClipboardCheck className="w-5 h-5 text-brand-blue" />
+      {variant === 'compact' ? (
+        // Slim single-row affordance: keeps the scanner (most important screen)
+        // uncluttered — small label + compact button, minimal vertical footprint.
+        <div className="mb-6 flex items-center justify-between gap-3 rounded-lg border border-gray-200 bg-white px-4 py-2">
+          <span className="flex items-center gap-2 text-sm font-medium text-gray-700">
+            <ClipboardCheck className="w-4 h-4 text-brand-blue" />
             Chiusura serata
-          </CardTitle>
-          <CardDescription>Registra la chiusura di stasera su Pizzeria Manager</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <Button onClick={handleOpen} disabled={pending} className="w-full sm:w-auto">
+          </span>
+          <Button onClick={handleOpen} disabled={pending} size="sm" variant="outline">
             {pending ? (
               <>
                 <Loader2 className="w-4 h-4 mr-2 animate-spin" />
                 Un attimo…
               </>
             ) : (
-              'Compila chiusura'
+              'Compila'
             )}
           </Button>
-        </CardContent>
-      </Card>
+        </div>
+      ) : (
+        <Card className="mb-6">
+          <CardHeader>
+            <CardTitle className="text-lg flex items-center gap-2">
+              <ClipboardCheck className="w-5 h-5 text-brand-blue" />
+              Chiusura serata
+            </CardTitle>
+            <CardDescription>Registra la chiusura di stasera su Pizzeria Manager</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <Button onClick={handleOpen} disabled={pending} className="w-full sm:w-auto">
+              {pending ? (
+                <>
+                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  Un attimo…
+                </>
+              ) : (
+                'Compila chiusura'
+              )}
+            </Button>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Location picker for multi-location brands without a pick today. */}
       {pickerOpen && (

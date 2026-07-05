@@ -556,8 +556,8 @@ export default function ScanQRPage() {
       {/* Staff location gate (BRAND-scoped multi-location only): badge + daily picker */}
       <StaffLocationGate />
 
-      {/* Chiusura serata handoff (staff and up) */}
-      <ChiusuraSerataCard />
+      {/* Chiusura serata handoff (staff and up) — compact to keep the scanner uncluttered */}
+      <ChiusuraSerataCard variant="compact" />
 
       {/* Top actions */}
       <div className="flex items-center justify-between mb-6">
