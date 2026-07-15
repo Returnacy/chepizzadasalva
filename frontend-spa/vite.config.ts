@@ -20,6 +20,20 @@ export default defineConfig({
   },
   server: {
     proxy: {
+      // Dev-only proxy so the local dev server can talk to prod backends
+      // same-origin (no CORS). Not used by `vite build`.
+      "/user-svc": {
+        target: "https://user.returnacy.app",
+        changeOrigin: true,
+        secure: false,
+        rewrite: (p) => p.replace(/^\/user-svc/, ""),
+      },
+      "/business-svc": {
+        target: "https://fidelity.business.chepizzadasalva.it",
+        changeOrigin: true,
+        secure: false,
+        rewrite: (p) => p.replace(/^\/business-svc/, ""),
+      },
       "/api": {
         target: "https://fidelity.business.chepizzadasalva.it",
         changeOrigin: true,
