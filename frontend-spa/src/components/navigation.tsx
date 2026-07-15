@@ -12,8 +12,12 @@ import {
   Activity,
   Target,
   MapPin,
+  ClipboardCheck,
+  ExternalLink,
+  Loader2,
 } from "lucide-react";
 import { useAuth } from "../hooks/use-auth";
+import { useChiusuraHandoff } from "../features/scan/hooks/useChiusuraHandoff";
 import { authorizer } from "../lib/policy";
 import { getTenantContext, getHighestRole } from "../lib/authz";
 import { Button } from "../components/ui/button";
@@ -22,6 +26,7 @@ import { useState, useEffect, useRef } from "react";
 export function Navigation() {
   const [location] = useLocation();
   const { user, logoutMutation } = useAuth();
+  const chiusura = useChiusuraHandoff();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [showScrollIndicator, setShowScrollIndicator] = useState(false);
   const scrollContainerRef = useRef(null as HTMLDivElement | null);
@@ -44,6 +49,14 @@ export function Navigation() {
       label: "Scanner QR",
       icon: QrCode,
       resource: 'nav', action: 'scanQr',
+    },
+    {
+      // External module (chiusura + inventory) reached via PizzeriaManager SSO handoff.
+      // Not a wouter route — clicking mints a token and navigates out of the app.
+      label: "Chiusura / Inventario",
+      icon: ClipboardCheck,
+      resource: 'nav', action: 'chiusura',
+      external: true,
     },
     {
       path: "/dashboard",
@@ -131,6 +144,31 @@ export function Navigation() {
     className?: string;
   }) => {
     const Icon = item.icon;
+
+    // External handoff item (Chiusura / Inventario): not a route — trigger the
+    // PM SSO handoff and close the sidebar. Never rendered as active.
+    if (item.external) {
+      return (
+        <span
+          onClick={() => {
+            setIsMobileMenuOpen(false);
+            chiusura.open();
+          }}
+          className={`flex items-center space-x-3 transition-colors cursor-pointer text-gray-600 hover:text-gray-900 hover:bg-gray-50 ${className} ${
+            chiusura.pending ? "opacity-60 pointer-events-none" : ""
+          }`}
+        >
+          {chiusura.pending ? (
+            <Loader2 className="w-5 h-5 animate-spin" />
+          ) : (
+            <Icon className="w-5 h-5" />
+          )}
+          <span className="font-medium flex-1">{item.label}</span>
+          <ExternalLink className="w-3.5 h-3.5 text-gray-400" />
+        </span>
+      );
+    }
+
     const isActive =
       location === item.path || (location === "/" && item.path === "/customer");
 
@@ -171,6 +209,28 @@ export function Navigation() {
                 <nav className="flex space-x-6 min-w-max">
                   {allowedNavItems.map((item) => {
                     const Icon = item.icon;
+
+                    // External handoff item — trigger PM SSO handoff, never active.
+                    if (item.external) {
+                      return (
+                        <span
+                          key={item.action}
+                          onClick={() => chiusura.open()}
+                          className={`py-4 px-2 border-b-2 border-transparent font-medium text-sm whitespace-nowrap flex items-center space-x-2 transition-colors cursor-pointer text-gray-500 hover:text-gray-700 ${
+                            chiusura.pending ? "opacity-60 pointer-events-none" : ""
+                          }`}
+                        >
+                          {chiusura.pending ? (
+                            <Loader2 className="w-4 h-4 animate-spin" />
+                          ) : (
+                            <Icon className="w-4 h-4" />
+                          )}
+                          <span>{item.label}</span>
+                          <ExternalLink className="w-3 h-3 text-gray-400" />
+                        </span>
+                      );
+                    }
+
                     const isActive =
                       location === item.path ||
                       (location === "/" && item.path === "/customer");
@@ -293,6 +353,7 @@ export function Navigation() {
               <nav className="flex-1 py-4 overflow-y-auto">
                 {allowedNavItems.map((item) => (
                   <NavItem
+                    key={item.path || item.action}
                     item={item}
                     className="px-6 py-3 block rounded-lg mx-4 mb-2"
                   />
@@ -316,6 +377,9 @@ export function Navigation() {
           </div>
         </div>
       )}
+
+      {/* Location picker modal for the Chiusura / Inventario handoff (multi-location). */}
+      {chiusura.picker}
     </>
   );
 }

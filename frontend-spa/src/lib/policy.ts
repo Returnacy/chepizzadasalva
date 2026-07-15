@@ -6,6 +6,7 @@ export const policy: Record<string, Record<string, Role>> = {
   nav: {
     customer: 'user',
     scanQr: 'staff',
+    chiusura: 'staff',
     dashboard: 'manager',
     insights: 'manager',
     crm: 'staff',
