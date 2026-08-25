@@ -86,6 +86,93 @@ cliente finale che legge il CRM è la dimostrazione del bypass `azp`. Se il terz
 è già `403`, il bypass è mitigato da una env che non conosco: **fermarsi e
 rileggere** prima di procedere.
 
+##### 1b — due query sul DB user-service (sola lettura)
+
+Da eseguire sul DB user-service di Che Pizza **prima** del deploy. Sono `SELECT`:
+nessuna scrittura, nessuna migrazione.
+
+```sql
+-- (a) Utenti senza alcuna membership su Che Pizza (né brand né sedi)
+SELECT count(*) AS orfani
+FROM "User" u
+WHERE NOT EXISTS (
+  SELECT 1 FROM "UserMembership" m
+  WHERE m."userId" = u.id
+    AND (
+      m."brandId" = '385d4ebb-4c4b-46e9-8701-0d71bfd7ce47'
+      OR m."businessId" IN (
+        'af941888-ec4c-458e-b905-21673241af3e',   -- Taggi
+        'f103ce67-ad79-4bf6-99ca-1d632caf7786'    -- Lissaro
+      )
+    )
+);
+```
+
+**Interpretazione.** `0` → procedere. **`> 0`** → quegli utenti dopo il deploy
+non risultano clienti di nessun brand: il gate li respinge e la loro carta
+fedeltà sparisce. Erano tenuti in piedi dall'auto-iscrizione di `/me`, che
+questo branch disattiva. Due opzioni, da scegliere **prima** del passo 2:
+
+- **`ME_AUTO_ENROLL=true`** su user-service: li riaggancia al primo `/me` come
+  prima. Allora però il conteggio va rifatto a valle, prima di togliere il flag
+  al passo 6.
+- **bonifica**: `INSERT` mirato delle membership mancanti — la strada pulita se
+  il numero è piccolo.
+
+Prima di decidere, guardare *chi* sono: con timbri o coupon sono clienti veri;
+a zero, probabilmente registrazioni mai completate.
+
+```sql
+-- (b) Righe legacy: membership con brandId NULL, per ruolo
+SELECT role, count(*) FROM "UserMembership" WHERE "brandId" IS NULL GROUP BY role;
+```
+
+**Interpretazione.** **Non è più bloccante**: il commit `fix(authz)` allinea
+user-service a business-service, quindi una riga con `brandId` NULL vale se il
+suo `businessId` è una sede del brand. Va però saputo:
+
+- righe con `role` diverso da `USER` sono staff che dopo il deploy dipendono dal
+  fallback su `businessId`. Se una di quelle righe ha **anche** `businessId`
+  NULL, quella persona non appartiene a nessun brand e perde l'accesso:
+  ```sql
+  SELECT count(*) FROM "UserMembership" WHERE "brandId" IS NULL AND "businessId" IS NULL;
+  ```
+  Atteso `0`. Se `> 0`, sistemare quelle righe prima del deploy.
+- un numero alto di righe legacy è anche il segnale che una bonifica di
+  `brandId` va pianificata a parte, dopo questo deploy.
+
+##### 1c — tre controlli di configurazione
+
+- **`USER_SERVICE_URL` sul business-service**: ora è *fail-closed*. Il backfill
+  delle membership da `/me` è l'unica fonte di membership per i token utente (i
+  token non portano claim di membership); se la var manca, `userMemberships`
+  resta vuoto e **ogni utente prende 403**. Prima il bypass `azp` mascherava la
+  cosa. Verificare che sia valorizzata su Railway.
+- **Build command di Cloudflare Pages**: se è `vite build` (o `npx vite build`)
+  lo script `prebuild` **non gira** e il controllo brand non viene eseguito. Per
+  Che Pizza è indifferente (i default sono i suoi), ma per un brand nuovo quel
+  controllo è tutta la rete di sicurezza: impostare il build command a
+  **`npm run build`** (o `pnpm build`).
+- **`REQUIRE_TENANT_SERVICE_TOKENS`**: deve restare **assente** su Che Pizza fino
+  alla rotazione (§8.2). Impostarlo ora blocca il business-service.
+
+##### 1d — changelog delle risposte API
+
+| Endpoint | Prima | Dopo |
+|---|---|---|
+| `POST $BS/api/v1/users` con token cliente | 200 | **403** |
+| `GET $US/api/v1/users/:id` da un cliente | 200 | **403** |
+| `GET $US/api/v1/users/:id` fuori brand | 200 | **404** |
+| `PATCH $US/api/v1/users/:id/memberships` con `memberships: []` | 200 | **400 `NO_MEMBERSHIPS`** |
+| `PATCH .../memberships` cross-brand | 200 | **403 `CROSS_TENANT_FORBIDDEN`** |
+| `POST $BS/api/v1/stamps` con businessId fuori brand | 200 | **400** |
+| `GET $BS/api/v1/coupons?userId=<altro>` da cliente | 200 | **403** |
+
+Il `400 NO_MEMBERSHIPS` è nuovo: prima un array vuoto restituiva `200` senza far
+nulla. Nessun chiamante noto lo invia — la SPA manda sempre almeno una entry —
+ma è un cambio di contratto da conoscere se qualcosa di esterno chiama
+quell'endpoint.
+
 #### Passo 2 — deploy `user-service`
 
 Merge di `feat/tenant-scoped-authz` → deploy Railway. **Nessuna migrazione DB**:
