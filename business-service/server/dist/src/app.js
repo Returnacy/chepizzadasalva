@@ -31,6 +31,9 @@ export async function buildApp() {
         const flag = String(process.env.REQUIRE_TENANT_SERVICE_TOKENS ?? '').toLowerCase().trim();
         return flag === 'true' || flag === '1' || flag === 'yes';
     };
+    // Warnings already emitted in this process, for the ones that would otherwise
+    // repeat on every single request. See the logging block in the hook below.
+    const warnedOnce = new Set();
     app.addHook('preHandler', async (request, reply) => {
         if (request.method === 'OPTIONS')
             return;
@@ -64,7 +67,17 @@ export async function buildApp() {
             requireTenantScopedServiceTokens: requireTenantScopedServiceTokens(),
         });
         if (decision.warn) {
-            request.log.warn({ path, ownBrandId, azp: auth?.azp }, `[business-service] ${decision.warn}`);
+            // The rotation-window notice is once per client id per process: every
+            // stamp passes through here, so a per-request warn would bury the very
+            // signal the rotation runbook tells you to watch for. Refusals are never
+            // deduped — each one is an event worth seeing.
+            const dedupe = decision.allow && decision.warn.includes('rotation window');
+            const key = `${decision.warn}::${auth?.azp ?? ''}`;
+            if (!dedupe || !warnedOnce.has(key)) {
+                if (dedupe)
+                    warnedOnce.add(key);
+                request.log.warn({ path, ownBrandId, azp: auth?.azp, oncePerProcess: dedupe }, `[business-service] ${decision.warn}`);
+            }
         }
         if (!decision.allow) {
             return reply.status(decision.status).send(decision.message ? { error: decision.error, message: decision.message } : { error: decision.error });
