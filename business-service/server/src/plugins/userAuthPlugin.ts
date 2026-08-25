@@ -10,11 +10,14 @@ type Membership = {
 declare module 'fastify' {
   interface FastifyRequest {
     userMemberships?: Membership[];
+    /** user-service `User.id` of the caller, learned from the /me backfill. */
+    selfUserId?: string;
   }
 }
 
 export default fp(async (fastify) => {
   fastify.decorateRequest('userMemberships', undefined);
+  fastify.decorateRequest('selfUserId', undefined);
 
   fastify.addHook('preHandler', async (request) => {
     if (!request.auth) return;
@@ -74,6 +77,11 @@ export default fp(async (fastify) => {
           const res = await fetch(`${base}/api/v1/me`, { headers: { Authorization: authHeader, Accept: 'application/json' } });
           if (res.ok) {
             const data: any = await res.json();
+            // Same response also tells us who the caller is, which is how the
+            // customer-facing routes scope a request to the caller's own data.
+            if (typeof data?.id === 'string' && data.id.length > 0) {
+              (request as any).selfUserId = data.id;
+            }
             const ms = Array.isArray(data?.memberships) ? data.memberships : [];
             const realmRoles: string[] = Array.isArray((request.auth as any)?.realm_access?.roles)
               ? ((request.auth as any).realm_access.roles as string[]).map((r) => String(r).toLowerCase())

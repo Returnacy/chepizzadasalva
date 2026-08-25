@@ -3,9 +3,14 @@ import crypto from 'node:crypto';
 import { TokenService } from '../services/tokenService.js';
 import { UserServiceClient } from '../services/userServiceClient.js';
 export function registerStampsRoutes(app) {
-    app.post('/api/v1/stamps', async (request) => {
+    app.post('/api/v1/stamps', async (request, reply) => {
         // Backward-compatible single-stamp endpoint (deprecated by batch below)
         const { userId, businessId } = request.body;
+        // Same location guard /apply has had all along: a stamp must land on a
+        // location of this brand, not on an arbitrary id taken from the body.
+        if (!(await app.repository.isBusinessInBrand(businessId))) {
+            return reply.code(400).send({ message: 'Unknown location for this brand' });
+        }
         const stamp = await app.repository.addStamp(userId, businessId);
         return { stamp };
     });

@@ -6,6 +6,8 @@ type Membership = {
 declare module 'fastify' {
     interface FastifyRequest {
         userMemberships?: Membership[];
+        /** user-service `User.id` of the caller, learned from the /me backfill. */
+        selfUserId?: string;
     }
 }
 declare const _default: any;

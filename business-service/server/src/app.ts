@@ -2,6 +2,7 @@
 import Fastify from 'fastify';
 import cors from '@fastify/cors';
 import prismaRepositoryPlugin from './plugins/prismaRepositoryPlugin.js';
+import { evaluateTenantAccess } from './authz/tenantAccess.js';
 import keycloakAuthPlugin from './plugins/keycloakAuthPlugin.js';
 import userAuthPlugin from './plugins/userAuthPlugin.js';
 import { registerBusinessRoutes } from './routes/business.routes.js';
@@ -28,32 +29,52 @@ export async function buildApp() {
       .map((s) => s.trim())
       .filter((s) => s.length > 0)
   );
+  // One deployment serves one brand (DEFAULT_BRAND_ID). The decision itself
+  // lives in ./authz/tenantAccess.ts as a pure function so it can be tested
+  // without a container — see the note at the top of that file.
+  const requireTenantScopedServiceTokens = () => {
+    const flag = String(process.env.REQUIRE_TENANT_SERVICE_TOKENS ?? '').toLowerCase().trim();
+    return flag === 'true' || flag === '1' || flag === 'yes';
+  };
+
   app.addHook('preHandler', async (request, reply) => {
     if (request.method === 'OPTIONS') return;
     const path = request.routerPath || (request.raw?.url ? request.raw.url.split('?')[0] : undefined);
     if (path === '/health') return;
-  const auth = (request as any).auth;
-  const routeConfig = (request as any).routeConfig ?? request.routeOptions?.config ?? {};
-  const allowUserAccess = routeConfig && routeConfig.allowUserAccess === true;
-  const allowedRoles = new Set(baseAllowedRoles);
-  if (allowUserAccess) allowedRoles.add('user');
-    if (auth) {
-      const azp = typeof auth.azp === 'string' ? auth.azp : undefined;
-      const audClaim = auth.aud;
-      const audList = Array.isArray(audClaim)
-        ? audClaim
-        : typeof audClaim === 'string'
-          ? [audClaim]
-          : [];
-      const serviceAllowed = (azp && allowedServices.has(azp)) || audList.some((aud) => allowedServices.has(String(aud)));
-      if (serviceAllowed) return;
+    const auth = (request as any).auth;
+    const routeConfig = (request as any).routeConfig ?? request.routeOptions?.config ?? {};
+    const allowUserAccess = routeConfig && routeConfig.allowUserAccess === true;
+    const allowedRoles = new Set(baseAllowedRoles);
+    if (allowUserAccess) allowedRoles.add('user');
+
+    // brandId is a static env value; the location list needs the DB, so a DB
+    // blip degrades to brand-only matching instead of locking out every
+    // brand-scoped member.
+    const ownBrandId = app.repository.brandId;
+    let ownBusinessIds: string[] = [];
+    try {
+      ownBusinessIds = await app.repository.getBrandBusinessIds();
+    } catch (err) {
+      request.log.error({ err }, '[business-service] could not load brand locations; matching on brandId only');
     }
-    const memberships = (request as any).userMemberships ?? [];
-    const hasAccess = memberships.some((membership: any) =>
-      Array.isArray(membership?.roles) && membership.roles.some((role: any) => allowedRoles.has(String(role).toLowerCase()))
-    );
-    if (!hasAccess) {
-      return reply.status(403).send({ error: 'FORBIDDEN', message: 'Requires staff or higher role' });
+
+    const decision = evaluateTenantAccess({
+      auth,
+      memberships: (request as any).userMemberships ?? [],
+      ownBrandId,
+      ownBusinessIds,
+      allowedRoles,
+      allowedServices,
+      requireTenantScopedServiceTokens: requireTenantScopedServiceTokens(),
+    });
+
+    if (decision.warn) {
+      request.log.warn({ path, ownBrandId, azp: auth?.azp }, `[business-service] ${decision.warn}`);
+    }
+    if (!decision.allow) {
+      return reply.status(decision.status).send(
+        decision.message ? { error: decision.error, message: decision.message } : { error: decision.error },
+      );
     }
   });
 

@@ -1,5 +1,6 @@
 import { TokenService } from '../services/tokenService.js';
 import { UserServiceClient } from '../services/userServiceClient.js';
+import { callerIsBrandStaff } from '../authz/tenantAccess.js';
 function serializeCoupon(coupon) {
     return {
         id: coupon.id,
@@ -84,26 +85,49 @@ export function registerCouponsRoutes(app) {
         }
         return { coupon: serializeCoupon(coupon) };
     });
-    app.get('/api/v1/coupons', async (request, reply) => {
-        const { userId, businessId, code } = request.query;
-        if (!businessId) {
-            return reply.code(400).send({ message: 'businessId required' });
-        }
-        if (code) {
-            const trimmedCode = String(code).trim();
-            if (!trimmedCode) {
-                return reply.code(400).send({ message: 'code required' });
+    // allowUserAccess: customers read their own loyalty card here (customer.tsx
+    // → legacy-api-adapter.getUserCoupons). They only ever reached it because
+    // every user token slipped through the global gate's service branch; now that
+    // the branch is closed the route has to grant it explicitly, or the card
+    // silently empties for every customer.
+    app.get('/api/v1/coupons', {
+        config: { allowUserAccess: true },
+        handler: async (request, reply) => {
+            const { businessId, code } = request.query;
+            let userId = request.query.userId;
+            if (!businessId) {
+                return reply.code(400).send({ message: 'businessId required' });
             }
-            const coupon = await app.repository.findCouponByCode(trimmedCode, businessId);
-            if (!coupon) {
-                return reply.code(404).send({ message: 'Coupon not found' });
+            // Staff may ask about anyone in the brand; a customer only about
+            // themselves. Opening this route to customers without that would swap a
+            // cross-tenant hole for an in-tenant one.
+            const isStaff = callerIsBrandStaff(request.userMemberships ?? [], app.repository.brandId, await app.repository.getBrandBusinessIds().catch(() => []));
+            if (!isStaff) {
+                const self = request.selfUserId;
+                // Lookup-by-code is the counter scanner's flow, not a customer's.
+                if (!self || code)
+                    return reply.code(403).send({ error: 'FORBIDDEN' });
+                if (userId && String(userId) !== String(self)) {
+                    return reply.code(403).send({ error: 'FORBIDDEN' });
+                }
+                userId = self;
             }
-            return { coupons: [serializeCoupon(coupon)] };
-        }
-        if (!userId) {
-            return reply.code(400).send({ message: 'userId required' });
-        }
-        const coupons = await app.repository.listCoupons(String(userId), businessId);
-        return { coupons: coupons.map(serializeCoupon) };
+            if (code) {
+                const trimmedCode = String(code).trim();
+                if (!trimmedCode) {
+                    return reply.code(400).send({ message: 'code required' });
+                }
+                const coupon = await app.repository.findCouponByCode(trimmedCode, businessId);
+                if (!coupon) {
+                    return reply.code(404).send({ message: 'Coupon not found' });
+                }
+                return { coupons: [serializeCoupon(coupon)] };
+            }
+            if (!userId) {
+                return reply.code(400).send({ message: 'userId required' });
+            }
+            const coupons = await app.repository.listCoupons(String(userId), businessId);
+            return { coupons: coupons.map(serializeCoupon) };
+        },
     });
 }
