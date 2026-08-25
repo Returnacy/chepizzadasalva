@@ -8,6 +8,7 @@ import { CrossLocationTab } from '../features/location-insights/components/Cross
 import { RetentionTab } from '../features/location-insights/components/RetentionTab';
 import { RewardFunnelTab } from '../features/location-insights/components/RewardFunnelTab';
 import { HeatmapTab } from '../features/location-insights/components/HeatmapTab';
+import { BRAND } from '../config/brand';
 
 // Group B — dedicated per-location analytics, kept off the main owner dashboard
 // so each can be a focused, deep view. A single period selector drives them all.
@@ -22,7 +23,7 @@ export default function LocationInsightsPage() {
           <h1 className="text-3xl font-bold text-gray-900 mb-2 flex items-center">
             <MapPin className="w-7 h-7 mr-2 text-brand-blue" />Analisi Sedi
           </h1>
-          <p className="text-gray-600">Analisi approfondite per pizzeria — Che Pizza</p>
+          <p className="text-gray-600">Analisi approfondite per pizzeria — {BRAND.name}</p>
         </div>
         <Select value={days} onValueChange={setDays}>
           <SelectTrigger className="w-40" aria-label="Periodo"><SelectValue /></SelectTrigger>

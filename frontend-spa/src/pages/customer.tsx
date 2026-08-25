@@ -15,6 +15,7 @@ import { useAuth } from "../hooks/use-auth";
 import { CouponType } from "../types/coupon";
 import { http } from "../lib/http";
 import { getBusinessId, userHttp } from "../lib/servicesHttp";
+import { BRAND } from '../config/brand';
 
 export default function CustomerPage() {
   const { toast } = useToast();
@@ -241,8 +242,8 @@ export default function CustomerPage() {
         <div className="text-center mb-8">
           <div className="flex items-center justify-center mb-4">
             <img
-              src={loyaltyLogo}
-              alt="Che Pizza Fidelity Logo"
+              src={BRAND.logoUrl || loyaltyLogo}
+              alt={`${BRAND.name} Fidelity Logo`}
               className="h-40 w-auto max-w-full md:h-32 lg:h-36"
             />
           </div>

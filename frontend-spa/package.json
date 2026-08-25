@@ -39,6 +39,8 @@
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
     "dev": "npx vite",
+    "check:brand": "node scripts/check-brand.mjs",
+    "prebuild": "node scripts/check-brand.mjs",
     "build": "vite build",
     "preview": "vite preview"
   },

@@ -12,6 +12,7 @@ import { LoginForm } from '../features/auth/components/LoginForm';
 import { RegisterForm } from '../features/auth/components/RegisterForm';
 import { useToast } from '../hooks/use-toast';
 import { tokenService } from '../lib/token-service';
+import { BRAND } from '../config/brand';
 
 export default function AuthPage() {
   const [, setLocation] = useLocation();
@@ -196,7 +197,7 @@ export default function AuthPage() {
             <div className="flex items-center space-x-2">
               <Pizza className="h-8 w-8 text-brand-blue" />
               <h1 className="text-3xl font-bold text-gray-900">
-                Che Pizza da Salva
+                {BRAND.fullName}
               </h1>
             </div>
             <h2 className="text-5xl font-bold text-gray-900 leading-tight">
@@ -247,7 +248,7 @@ export default function AuthPage() {
             <div className="flex items-center justify-center space-x-2 mb-2">
               <Pizza className="h-6 w-6 text-brand-blue" />
               <h1 className="text-xl font-bold text-gray-900">
-                Che Pizza da Salva
+                {BRAND.fullName}
               </h1>
             </div>
             <p className="text-sm text-gray-600">Sistema di fedeltà digitale</p>

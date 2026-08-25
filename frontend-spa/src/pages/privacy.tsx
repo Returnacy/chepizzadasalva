@@ -1,3 +1,4 @@
+import { BRAND } from '../config/brand';
 export default function PrivacyPage() {
   return (
     <div className="mx-auto max-w-3xl px-4 py-8 text-gray-900">
@@ -11,8 +12,8 @@ export default function PrivacyPage() {
       </p>
       <h2 className="text-xl font-semibold mt-6 mb-2">1.TITOLARE DEL TRATTAMENTO</h2>
       <p className="mb-4">
-        Il titolare del trattamento è Che Pizza! Di Stella Salvatore (“Titolare del Trattamento”) con sede in
-        via Firenze 25, Villafranca Padovana (PD), indirizzo email <a className="underline text-blue-600" href="mailto:salvatore@chepizzadasalva.it">salvatore@chepizzadasalva.it</a>.
+        Il titolare del trattamento è {BRAND.legalName} (“Titolare del Trattamento”) con sede in
+        {" "}{BRAND.legalAddress}, indirizzo email <a className="underline text-blue-600" href={`mailto:${BRAND.contactEmail}`}>{BRAND.contactEmail}</a>.
       </p>
       <h2 className="text-xl font-semibold mt-6 mb-2">2.TIPOLOGIA DI DATI TRATTATI</h2>
       <p className="font-medium mb-2">a) Dati forniti volontariamente dall’utente</p>
@@ -128,7 +129,7 @@ export default function PrivacyPage() {
       </p>
       <p className="mb-4">
         L’interessato potrà esercitare in qualsiasi momento i suoi diritti inviando al Titolare una
-        comunicazione al seguente indirizzo mail <a className="underline text-blue-600" href="mailto:salvatore@chepizzadasalva.it">salvatore@chepizzadasalva.it</a> o all’indirizzo del Titolare
+        comunicazione al seguente indirizzo mail <a className="underline text-blue-600" href={`mailto:${BRAND.contactEmail}`}>{BRAND.contactEmail}</a> o all’indirizzo del Titolare
         come sopra riportato.
       </p>
     </div>

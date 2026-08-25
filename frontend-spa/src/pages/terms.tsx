@@ -1,3 +1,4 @@
+import { BRAND } from '../config/brand';
 export default function TermsPage() {
   return (
     <div className="mx-auto max-w-3xl px-4 py-8 text-gray-900">
@@ -6,9 +7,9 @@ export default function TermsPage() {
       <p className="mb-4">
         I presenti Termini e Condizioni (di seguito i “Termini”) disciplinano l'iscrizione e la
         partecipazione al programma fedeltà (di seguito il “Programma”) offerto da
-        <strong> Che Pizza! Di Stella Salvatore</strong>, con sede legale in via Firenze 25, 35010
-        Villafranca Padovana (PD), C.F. STLSVT02M20G224Y, P. IVA 05639230282, indirizzo email
-        {" "}<a className="underline text-blue-600" href="mailto:salvatore@chepizzadasalva.it">salvatore@chepizzadasalva.it</a>
+        <strong> {BRAND.legalName}</strong>, con sede legale in {BRAND.legalAddress},
+        C.F. {BRAND.legalTaxCode}, P. IVA {BRAND.legalVat}, indirizzo email
+        {" "}<a className="underline text-blue-600" href={`mailto:${BRAND.contactEmail}`}>{BRAND.contactEmail}</a>
         {" "}(di seguito il “Locale” o il “Titolare del Programma”), e fruibile attraverso la piattaforma
         denominata “Returnacy” e/o i canali web del Locale (di seguito i “Canali web”).
       </p>
@@ -117,7 +118,7 @@ export default function TermsPage() {
         Trattandosi di adesione gratuita, l'Utente può recedere dal Programma e richiedere la
         cancellazione del proprio Account in qualsiasi momento, senza oneri, tramite le funzioni
         disponibili in-app o inviando una richiesta all'indirizzo
-        {" "}<a className="underline text-blue-600" href="mailto:salvatore@chepizzadasalva.it">salvatore@chepizzadasalva.it</a>.
+        {" "}<a className="underline text-blue-600" href={`mailto:${BRAND.contactEmail}`}>{BRAND.contactEmail}</a>.
         Con la cancellazione dell'Account i Punti non ancora riscattati si intendono definitivamente
         perduti. Restano fermi gli obblighi di conservazione dei dati previsti dalla legge, come indicato
         nell'Informativa Privacy.
@@ -192,7 +193,7 @@ export default function TermsPage() {
       <p className="mb-4">
         Per qualsiasi informazione o richiesta relativa al Programma e ai presenti Termini è possibile
         contattare il Locale all'indirizzo
-        {" "}<a className="underline text-blue-600" href="mailto:salvatore@chepizzadasalva.it">salvatore@chepizzadasalva.it</a>
+        {" "}<a className="underline text-blue-600" href={`mailto:${BRAND.contactEmail}`}>{BRAND.contactEmail}</a>
         {" "}o presso la sede sopra indicata.
       </p>
 

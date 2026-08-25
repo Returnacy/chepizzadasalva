@@ -14,6 +14,7 @@ import { LocationStrip } from '../features/analytics/components/LocationStrip';
 import { LocationStampsChart } from '../features/analytics/components/LocationStampsChart';
 import { useOverviewMetrics, useRepeatRateMetrics, useFrequencyMetrics, useEconomicMetrics, useDailyTransactions } from '../features/analytics/hooks';
 import { fetchLocations } from '../api/locationAnalytics';
+import { BRAND } from '../config/brand';
 
 // Local interfaces kept for internal mapping (data now derived from two backend endpoints)
 // (Feedback & traffic placeholders retained until backend integration)
@@ -266,7 +267,7 @@ export default function DashboardPage() {
           <h1 className="text-3xl font-bold text-gray-900 mb-2">
             Owner Dashboard
           </h1>
-          <p className="text-gray-600">Che Pizza Loyalty System Analytics</p>
+          <p className="text-gray-600">{BRAND.name} Loyalty System Analytics</p>
         </div>
         {multiLocation && (
           <div className="flex items-center gap-2">

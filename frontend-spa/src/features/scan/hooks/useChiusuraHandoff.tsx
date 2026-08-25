@@ -12,11 +12,9 @@ import { useAuth } from '../../../hooks/use-auth';
 import { hasAnyRole } from '../../../lib/authz';
 import { userHttp, businessHttp } from '../../../lib/servicesHttp';
 import { getSelectedLocation, setSelectedLocation } from '../../../lib/staffLocation';
+import { PM_URL } from '../../../config/brand';
 
 type Loc = { id: string; name: string; address?: string };
-
-const ENV: any = (import.meta as any).env || {};
-const PM_URL: string = (ENV.VITE_PM_URL || 'https://statistich3.chepizzadasalva.it').replace(/\/$/, '');
 
 export function useChiusuraHandoff() {
   const { user } = useAuth();
@@ -40,7 +38,11 @@ export function useChiusuraHandoff() {
   async function mint(businessId: string, name: string) {
     try {
       setPending(true);
-      const res = await userHttp.post<{ token: string; expiresIn: number }>('/api/v1/auth/pm-handoff');
+      // The location now goes in the request body so user-service can validate
+      // it against the brand and put it in the token. The `loc` fragment stays
+      // for backwards compatibility, but PizzeriaManager prefers the claim —
+      // see user-service/docs/SSO-PM-CONTRACT.md §4.
+      const res = await userHttp.post<{ token: string; expiresIn: number }>('/api/v1/auth/pm-handoff', { businessId });
       const url = `${PM_URL}/sso#token=${res.token}&loc=${businessId}&locName=${encodeURIComponent(name || '')}`;
       window.location.href = url; // navigation away — no need to clear pending
     } catch (e) {

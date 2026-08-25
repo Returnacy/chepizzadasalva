@@ -22,6 +22,7 @@ import { authorizer } from "../lib/policy";
 import { getTenantContext, getHighestRole } from "../lib/authz";
 import { Button } from "../components/ui/button";
 import { useState, useEffect, useRef } from "react";
+import { BRAND } from '../config/brand';
 
 export function Navigation() {
   const [location] = useLocation();
@@ -197,7 +198,7 @@ export function Navigation() {
             {/* Fixed Left: Logo */}
             <div className="flex items-center space-x-2 flex-shrink-0">
               <Pizza className="w-6 h-6 text-brand-blue" />
-              <span className="text-lg font-bold text-gray-900 whitespace-nowrap">Che Pizza</span>
+              <span className="text-lg font-bold text-gray-900 whitespace-nowrap">{BRAND.name}</span>
             </div>
 
             {/* Scrollable Middle: Navigation Links (Desktop only) */}
@@ -325,7 +326,7 @@ export function Navigation() {
                 <div className="flex items-center space-x-2">
                   <Pizza className="w-6 h-6 text-brand-blue" />
                   <span className="text-lg font-bold text-gray-900">
-                    Che Pizza da Salva
+                    {BRAND.fullName}
                   </span>
                 </div>
                 <Button
