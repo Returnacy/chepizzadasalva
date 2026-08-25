@@ -15,7 +15,8 @@
   "scripts": {
     "prebuild": "prisma generate --schema=./prisma/schema.prisma",
     "build": "tsc -b .",
-    "start": "node dist/prismaClient.js"
+    "start": "node dist/prismaClient.js",
+    "seed": "node dist/src/seed.js"
   },
   "devDependencies": {
     "@types/node": "^20.11.30",
