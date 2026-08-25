@@ -12,7 +12,10 @@ a loyalty attiva: timbri, coupon, QR, scanner, staff.
 
 ---
 
-## 0. Prima di iniziare — due cose da chiudere
+## 0. Prima di iniziare
+
+Il §0.2 è un runbook a sé: **il security set va in produzione su Che Pizza prima
+di qualunque onboarding**. I §0.1 e §0.3 sono i due prerequisiti da chiudere.
 
 ### 0.1 ⚠️ TODO APERTO: probe rotte cliente in produzione
 
@@ -50,7 +53,108 @@ curl -s -o /dev/null -w '%{http_code}\n' \
 Verificare anche che un cliente **non** possa leggere i coupon di un altro
 (`userId` di un terzo → atteso **403** dopo il deploy).
 
-### 0.2 Dati che deve fornire il cliente
+### 0.2 Runbook: deploy del security set su Che Pizza
+
+Il security set va in produzione **su Che Pizza per prima e da sola**, prima di
+qualunque brand nuovo: è l'unico modo di isolare una regressione. Questa
+checklist serve a decidere **quando** farlo — non va eseguita insieme
+all'onboarding di un cliente.
+
+```bash
+BIZ=af941888-ec4c-458e-b905-21673241af3e          # Taggi
+BS=https://fidelity.business.chepizzadasalva.it
+US=https://user.returnacy.app
+CUST_TOKEN=...    # access token di un CLIENTE finale (ruolo USER)
+STAFF_TOKEN=...   # access token di uno STAFF Che Pizza
+CUST_ID=...       # User.id del cliente (da GET $US/api/v1/me)
+OTHER_ID=...      # User.id di un ALTRO cliente Che Pizza
+```
+
+#### Passo 1 — probe PRIMA del deploy (§0.1)
+
+Registrare le risposte attuali: senza baseline non si distingue una regressione
+da un bug preesistente.
+
+```bash
+curl -s -o /dev/null -w 'coupons:     %{http_code}\n' -H "Authorization: Bearer $CUST_TOKEN" "$BS/api/v1/coupons?userId=$CUST_ID&businessId=$BIZ"
+curl -s -o /dev/null -w 'progression: %{http_code}\n' -H "Authorization: Bearer $CUST_TOKEN" "$BS/api/v1/prizes/progression?userId=$CUST_ID"
+curl -s -o /dev/null -w 'users(CRM):  %{http_code}\n' -H "Authorization: Bearer $CUST_TOKEN" -X POST "$BS/api/v1/users" -H 'content-type: application/json' -d "{\"businessId\":\"$BIZ\"}"
+```
+
+Attese sul codice **attuale**: `200`, `200`, e **`200` anche sul terzo** — un
+cliente finale che legge il CRM è la dimostrazione del bypass `azp`. Se il terzo
+è già `403`, il bypass è mitigato da una env che non conosco: **fermarsi e
+rileggere** prima di procedere.
+
+#### Passo 2 — deploy `user-service`
+
+Merge di `feat/tenant-scoped-authz` → deploy Railway. **Nessuna migrazione DB**:
+il branch non cambia lo schema.
+
+Env da NON toccare qui: lasciare `INTERNAL_SERVICE_CLIENTS` invariata (la
+rotazione è il §8, separata) e **non** impostare `REQUIRE_TENANT_SERVICE_TOKENS`
+— deve restare assente, cioè finestra aperta, altrimenti il business-service
+ancora vecchio viene rifiutato.
+
+```bash
+curl -s -o /dev/null -w 'jwks: %{http_code}\n' "$US/.well-known/jwks.json"                             # 200
+curl -s -o /dev/null -w 'me:   %{http_code}\n' -H "Authorization: Bearer $CUST_TOKEN" "$US/api/v1/me"  # 200 — nessun re-login
+curl -s -o /dev/null -w 'users/:id da cliente: %{http_code}\n' -H "Authorization: Bearer $CUST_TOKEN" "$US/api/v1/users/$OTHER_ID"
+```
+
+L'ultimo → **403** (prima: 200 con email, telefono e membership di chiunque).
+
+A log è atteso `[tenant] tenant-blind service token accepted during rotation
+window`: corretto in questa fase, il business-service non è ancora rotato.
+
+#### Passo 3 — deploy `business-service` Che Pizza
+
+Push su `chepizzadasalva` main → Railway + Cloudflare Pages (un push ne fa due).
+
+> Il gate del business-service è testato come funzione pura, non attraverso
+> Fastify (`prismaRepositoryPlugin` importa Prisma da un path di container).
+> **Questo passo è il primo test reale del cablaggio**: tenere i log aperti.
+
+#### Passo 4 — verifica funzionale, in quest'ordine
+
+| # | Cosa | Comando / azione | Atteso |
+|---|---|---|---|
+| 1 | Il cliente vede ancora i coupon | `curl -s -H "Authorization: Bearer $CUST_TOKEN" "$BS/api/v1/coupons?userId=$CUST_ID&businessId=$BIZ"` | **200**, stessi coupon del passo 1 |
+| 2 | Progressione premi | `curl -s -o /dev/null -w '%{http_code}\n' -H "Authorization: Bearer $CUST_TOKEN" "$BS/api/v1/prizes/progression?userId=$CUST_ID"` | **200** |
+| 3 | Carta fedeltà nel browser | aprire `fidelity.chepizzadasalva.it` come cliente | timbri e coupon visibili |
+| 4 | **Il CRM si è chiuso ai clienti** | `curl -s -o /dev/null -w '%{http_code}\n' -H "Authorization: Bearer $CUST_TOKEN" -X POST "$BS/api/v1/users" -H 'content-type: application/json' -d "{\"businessId\":\"$BIZ\"}"` | **403** (era 200) |
+| 5 | Un cliente non legge i coupon altrui | `curl -s -o /dev/null -w '%{http_code}\n' -H "Authorization: Bearer $CUST_TOKEN" "$BS/api/v1/coupons?userId=$OTHER_ID&businessId=$BIZ"` | **403** |
+| 6 | Lo staff timbra | `/scan-qr` come staff, timbrare un cliente di prova | timbro registrato, contatori sincronizzati |
+| 7 | Lo staff vede il CRM | `curl -s -o /dev/null -w '%{http_code}\n' -H "Authorization: Bearer $STAFF_TOKEN" -X POST "$BS/api/v1/users" -H 'content-type: application/json' -d "{\"businessId\":\"$BIZ\"}"` | **200** |
+| 8 | Attribuzione multi-sede | timbrare selezionando Lissaro | `Stamp.businessId` = Lissaro |
+| 9 | Chiusura / Inventario | voce di nav come staff | apre PM, sede preselezionata |
+| 10 | Analisi Sedi | aprire le tab | caricano dati reali |
+
+**Il test cross-tenant vero (staff Che Pizza → business-service di un brand B)
+non è eseguibile finché un brand B non esiste**: sta al §11, non qui.
+
+#### Passo 5 — rollback
+
+Ordine inverso: redeploy del commit precedente del **business-service prima**,
+user-service dopo. user-service nuovo è compatibile col business-service vecchio;
+il contrario no, perché il gate nuovo pretende un `sub` di servizio corretto.
+
+Caso specifico: se falliscono **solo** i punti 1-3 (i clienti non vedono la
+carta) e tutto il resto è verde, la causa è nel blocco `allowUserAccess` delle
+rotte cliente, non nel gate → rollback del solo business-service e riapertura
+del TODO §0.1.
+
+#### Passo 6 — `ME_AUTO_ENROLL`: quando toglierlo
+
+Il flag è solo un'uscita di sicurezza per un sistema senza staging.
+**Da rimuovere dopo 2 settimane senza regressioni** dal passo 2: se in quel
+periodo nessuno segnala una carta fedeltà scomparsa e a log non compare mai
+`[me] implicit membership enrolment`, cancellare il ramo
+`if (domain && autoEnrollEnabled)` in `get.me.service.ts` insieme al flag.
+Lasciarlo lì per sempre significa tenere vivo un percorso di iscrizione
+implicita cross-brand.
+
+### 0.3 Dati che deve fornire il cliente
 
 Mai inventati. Senza questi il build fallisce (§6.3):
 
