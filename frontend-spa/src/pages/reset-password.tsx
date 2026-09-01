@@ -78,7 +78,7 @@ export default function ResetPasswordPage() {
   // Show error if no token provided
   if (!token) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 to-indigo-100 p-4">
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-[var(--brand-surface-from)] to-[var(--brand-surface-to)] p-4">
         <Card className="w-full max-w-md">
           <CardHeader className="text-center">
             <div className="mx-auto w-12 h-12 bg-red-100 rounded-full flex items-center justify-center mb-4">
@@ -104,11 +104,11 @@ export default function ResetPasswordPage() {
   // Show loading while verifying token
   if (verifyingToken) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 to-indigo-100 p-4">
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-[var(--brand-surface-from)] to-[var(--brand-surface-to)] p-4">
         <Card className="w-full max-w-md">
           <CardContent className="pt-6">
             <div className="text-center">
-              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-4"></div>
+              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[var(--brand-accent)] mx-auto mb-4"></div>
               <p className="text-sm text-gray-600">Verifica del link in corso...</p>
             </div>
           </CardContent>
@@ -120,7 +120,7 @@ export default function ResetPasswordPage() {
   // Show error if token is invalid or expired
   if (tokenError || !tokenVerification?.valid) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 to-indigo-100 p-4">
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-[var(--brand-surface-from)] to-[var(--brand-surface-to)] p-4">
         <Card className="w-full max-w-md">
           <CardHeader className="text-center">
             <div className="mx-auto w-12 h-12 bg-red-100 rounded-full flex items-center justify-center mb-4">
@@ -151,7 +151,7 @@ export default function ResetPasswordPage() {
   // Show success message
   if (isSuccess) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 to-indigo-100 p-4">
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-[var(--brand-surface-from)] to-[var(--brand-surface-to)] p-4">
         <Card className="w-full max-w-md">
           <CardHeader className="text-center">
             <div className="mx-auto w-12 h-12 bg-green-100 rounded-full flex items-center justify-center mb-4">
@@ -181,11 +181,11 @@ export default function ResetPasswordPage() {
 
   // Show password reset form
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 to-indigo-100 p-4">
+    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-[var(--brand-surface-from)] to-[var(--brand-surface-to)] p-4">
       <Card className="w-full max-w-md">
         <CardHeader className="text-center">
-          <div className="mx-auto w-12 h-12 bg-blue-100 rounded-full flex items-center justify-center mb-4">
-            <Lock className="w-6 h-6 text-blue-600" />
+          <div className="mx-auto w-12 h-12 bg-[var(--brand-tint)] rounded-full flex items-center justify-center mb-4">
+            <Lock className="w-6 h-6 text-[var(--brand-accent)]" />
           </div>
           <CardTitle className="text-xl text-gray-900">Reimposta Password</CardTitle>
           <CardDescription className="text-sm text-gray-600">
@@ -265,8 +265,8 @@ export default function ResetPasswordPage() {
                 )}
               />
 
-              <div className="bg-blue-50 p-3 rounded-lg border border-blue-200">
-                <p className="text-xs text-blue-800">
+              <div className="bg-[var(--brand-surface-from)] p-3 rounded-lg border border-[var(--brand-tint-border)]">
+                <p className="text-xs text-[var(--brand-ink)]">
                   La password deve essere di almeno 8 caratteri e massimo 20.
                 </p>
               </div>

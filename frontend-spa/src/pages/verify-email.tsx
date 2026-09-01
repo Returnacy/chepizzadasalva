@@ -53,7 +53,7 @@ export default function VerifyEmailPage() {
   }, [status, navigate]);
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 to-indigo-100 p-4">
+    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-[var(--brand-surface-from)] to-[var(--brand-surface-to)] p-4">
       <Card className="w-full max-w-md">
         <CardHeader className="text-center">
           {status === "success" ? (
@@ -65,8 +65,8 @@ export default function VerifyEmailPage() {
               <AlertCircle className="w-6 h-6 text-red-600" />
             </div>
           ) : (
-            <div className="mx-auto w-12 h-12 bg-blue-100 rounded-full flex items-center justify-center mb-4">
-              <Loader2 className="w-6 h-6 text-blue-600 animate-spin" />
+            <div className="mx-auto w-12 h-12 bg-[var(--brand-tint)] rounded-full flex items-center justify-center mb-4">
+              <Loader2 className="w-6 h-6 text-[var(--brand-accent)] animate-spin" />
             </div>
           )}
           <CardTitle className="text-xl text-gray-900">

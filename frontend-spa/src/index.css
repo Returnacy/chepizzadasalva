@@ -29,6 +29,20 @@
   --brand-dark: 212 50% 29%; /* #27496D */
   --brand-cream: 44 33% 95%; /* #F4F1DE */
   --brand-red: 5 81% 51%; /* #D94830 */
+
+  /* Brand tints — the pale end of the brand: page backgrounds, info panels,
+     links. Plain hex, not the H S% L% triplets above, because every default
+     here is EXACTLY the Tailwind step it replaced — so a build without
+     VITE_BRAND_PRIMARY renders pixel-for-pixel what it did when these were
+     written as from-blue-50 / bg-blue-100 / text-blue-800. src/config/theme.ts
+     overwrites all seven when a brand states its colour. */
+  --brand-surface-from: #eff6ff;  /* was blue-50    — page gradient start, active nav item */
+  --brand-surface-to: #e0e7ff;    /* was indigo-100 — page gradient end */
+  --brand-tint: #dbeafe;          /* was blue-100   — icon circles, stat chips */
+  --brand-tint-border: #bfdbfe;   /* was blue-200   — info panel borders */
+  --brand-accent: #2563eb;        /* was blue-600   — links, small icons, spinners */
+  --brand-accent-strong: #1d4ed8; /* was blue-700   — the auth "password dimenticata" link */
+  --brand-ink: #1e40af;           /* was blue-800   — text inside info panels */
 }
 
 .dark {

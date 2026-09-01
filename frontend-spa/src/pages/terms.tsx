@@ -9,7 +9,7 @@ export default function TermsPage() {
         partecipazione al programma fedeltà (di seguito il “Programma”) offerto da
         <strong> {BRAND.legalName}</strong>, con sede legale in {BRAND.legalAddress},
         C.F. {BRAND.legalTaxCode}, P. IVA {BRAND.legalVat}, indirizzo email
-        {" "}<a className="underline text-blue-600" href={`mailto:${BRAND.contactEmail}`}>{BRAND.contactEmail}</a>
+        {" "}<a className="underline text-[var(--brand-accent)]" href={`mailto:${BRAND.contactEmail}`}>{BRAND.contactEmail}</a>
         {" "}(di seguito il “Locale” o il “Titolare del Programma”), e fruibile attraverso la piattaforma
         denominata “Returnacy” e/o i canali web del Locale (di seguito i “Canali web”).
       </p>
@@ -57,7 +57,7 @@ export default function TermsPage() {
       <h2 className="text-xl font-semibold mt-6 mb-2">4. CREAZIONE DELL'ACCOUNT E ACCETTAZIONE</h2>
       <p className="mb-4">
         L'iscrizione avviene compilando il modulo di registrazione sui Canali web e accettando i presenti
-        Termini nonché l'<a className="underline text-blue-600" href="/privacy" target="_blank" rel="noopener noreferrer">Informativa Privacy</a>.
+        Termini nonché l'<a className="underline text-[var(--brand-accent)]" href="/privacy" target="_blank" rel="noopener noreferrer">Informativa Privacy</a>.
         L'iscrizione e la partecipazione al Programma sono gratuite: non è previsto alcun corrispettivo a
         carico dell'Utente per il solo fatto di iscriversi e accumulare Punti.
       </p>
@@ -102,7 +102,7 @@ export default function TermsPage() {
         promozionali relative a prodotti, promozioni e iniziative tramite e-mail, SMS, MMS e WhatsApp.
         Il consenso è libero e facoltativo: il suo mancato rilascio non pregiudica l'iscrizione al
         Programma. L'Utente può opporsi a tali comunicazioni e revocare il consenso in qualsiasi momento,
-        con le modalità indicate nell'<a className="underline text-blue-600" href="/privacy" target="_blank" rel="noopener noreferrer">Informativa Privacy</a> e nelle comunicazioni ricevute.
+        con le modalità indicate nell'<a className="underline text-[var(--brand-accent)]" href="/privacy" target="_blank" rel="noopener noreferrer">Informativa Privacy</a> e nelle comunicazioni ricevute.
       </p>
 
       <h2 className="text-xl font-semibold mt-6 mb-2">9. OBBLIGHI DELL'UTENTE E USO CORRETTO</h2>
@@ -118,7 +118,7 @@ export default function TermsPage() {
         Trattandosi di adesione gratuita, l'Utente può recedere dal Programma e richiedere la
         cancellazione del proprio Account in qualsiasi momento, senza oneri, tramite le funzioni
         disponibili in-app o inviando una richiesta all'indirizzo
-        {" "}<a className="underline text-blue-600" href={`mailto:${BRAND.contactEmail}`}>{BRAND.contactEmail}</a>.
+        {" "}<a className="underline text-[var(--brand-accent)]" href={`mailto:${BRAND.contactEmail}`}>{BRAND.contactEmail}</a>.
         Con la cancellazione dell'Account i Punti non ancora riscattati si intendono definitivamente
         perduti. Restano fermi gli obblighi di conservazione dei dati previsti dalla legge, come indicato
         nell'Informativa Privacy.
@@ -176,7 +176,7 @@ export default function TermsPage() {
       <p className="mb-4">
         Il trattamento dei dati personali dell'Utente è effettuato dal Locale, in qualità di Titolare del
         trattamento, secondo quanto indicato nell'apposita
-        {" "}<a className="underline text-blue-600" href="/privacy" target="_blank" rel="noopener noreferrer">Informativa Privacy</a>,
+        {" "}<a className="underline text-[var(--brand-accent)]" href="/privacy" target="_blank" rel="noopener noreferrer">Informativa Privacy</a>,
         che costituisce parte integrante dell'esperienza di iscrizione e che si invita a consultare.
       </p>
 
@@ -193,7 +193,7 @@ export default function TermsPage() {
       <p className="mb-4">
         Per qualsiasi informazione o richiesta relativa al Programma e ai presenti Termini è possibile
         contattare il Locale all'indirizzo
-        {" "}<a className="underline text-blue-600" href={`mailto:${BRAND.contactEmail}`}>{BRAND.contactEmail}</a>
+        {" "}<a className="underline text-[var(--brand-accent)]" href={`mailto:${BRAND.contactEmail}`}>{BRAND.contactEmail}</a>
         {" "}o presso la sede sopra indicata.
       </p>
 

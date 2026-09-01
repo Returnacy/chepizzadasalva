@@ -204,7 +204,7 @@ export default function CustomerPage() {
 
   if (!user) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center p-4">
+      <div className="min-h-screen bg-gradient-to-br from-[var(--brand-surface-from)] to-[var(--brand-surface-to)] flex items-center justify-center p-4">
         <Card className="w-full max-w-md">
           <CardHeader className="text-center">
             <CardTitle className="text-2xl font-bold text-gray-800">
@@ -226,9 +226,9 @@ export default function CustomerPage() {
 
   if (clientQuery.isLoading) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center p-4">
+      <div className="min-h-screen bg-gradient-to-br from-[var(--brand-surface-from)] to-[var(--brand-surface-to)] flex items-center justify-center p-4">
         <div className="text-center">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto"></div>
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[var(--brand-accent)] mx-auto"></div>
           <p className="mt-4 text-gray-600">Caricamento...</p>
         </div>
       </div>
@@ -236,7 +236,7 @@ export default function CustomerPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100">
+    <div className="min-h-screen bg-gradient-to-br from-[var(--brand-surface-from)] to-[var(--brand-surface-to)]">
       <div className="container mx-auto px-4 py-8">
         {/* Header */}
         <div className="text-center mb-8">

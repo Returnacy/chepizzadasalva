@@ -113,8 +113,8 @@ export function StaffRegistration({ onSuccess, onCancel }: StaffRegistrationProp
     return (
       <Card className="w-full max-w-md mx-auto">
         <CardHeader className="text-center">
-          <div className="mx-auto w-12 h-12 bg-blue-100 rounded-full flex items-center justify-center mb-4">
-            <MessageSquare className="w-6 h-6 text-blue-600" />
+          <div className="mx-auto w-12 h-12 bg-[var(--brand-tint)] rounded-full flex items-center justify-center mb-4">
+            <MessageSquare className="w-6 h-6 text-[var(--brand-accent)]" />
           </div>
           <CardTitle className="text-xl">Verifica Telefono</CardTitle>
           <CardDescription>Inserisci il codice di verifica inviato a {verificationPhone}</CardDescription>
@@ -124,8 +124,8 @@ export function StaffRegistration({ onSuccess, onCancel }: StaffRegistrationProp
             <label htmlFor="verification-code" className="block text-sm font-medium text-gray-700 mb-2">Codice di Verifica</label>
             <Input id="verification-code" value={verificationCode} onChange={(e) => setVerificationCode(e.target.value)} placeholder="Inserisci il codice ricevuto via SMS" className="text-center text-lg tracking-widest" maxLength={6} disabled={registerMutation.isPending} />
           </div>
-          <div className="bg-blue-50 p-3 rounded-lg border border-blue-200">
-            <p className="text-xs text-blue-800">Il codice di verifica è stato inviato via SMS. Potrebbe richiedere alcuni minuti per arrivare.</p>
+          <div className="bg-[var(--brand-surface-from)] p-3 rounded-lg border border-[var(--brand-tint-border)]">
+            <p className="text-xs text-[var(--brand-ink)]">Il codice di verifica è stato inviato via SMS. Potrebbe richiedere alcuni minuti per arrivare.</p>
           </div>
           <div className="space-y-2">
             <Button onClick={onSubmitVerification} disabled={!verificationCode || verificationCode.length < 4 || registerMutation.isPending} className="w-full" size="lg">

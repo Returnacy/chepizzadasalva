@@ -178,7 +178,7 @@ export function Navigation() {
         <span
           className={`flex items-center space-x-3 transition-colors cursor-pointer ${className} ${
             isActive
-              ? "text-brand-blue bg-blue-50"
+              ? "text-brand-blue bg-[var(--brand-surface-from)]"
               : "text-gray-600 hover:text-gray-900 hover:bg-gray-50"
           }`}
         >

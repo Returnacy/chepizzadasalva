@@ -52,7 +52,7 @@ export default function ForgotPasswordPage() {
 
   if (isSubmitted) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 to-indigo-100 p-4">
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-[var(--brand-surface-from)] to-[var(--brand-surface-to)] p-4">
         <Card className="w-full max-w-md">
           <CardHeader className="text-center">
             <div className="mx-auto w-12 h-12 bg-green-100 rounded-full flex items-center justify-center mb-4">
@@ -64,8 +64,8 @@ export default function ForgotPasswordPage() {
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
-            <div className="bg-blue-50 p-4 rounded-lg border border-blue-200">
-              <p className="text-sm text-blue-800">
+            <div className="bg-[var(--brand-surface-from)] p-4 rounded-lg border border-[var(--brand-tint-border)]">
+              <p className="text-sm text-[var(--brand-ink)]">
                 📧 Controlla la tua casella email (inclusi spam/promozioni) per il link di reset della password.
               </p>
             </div>
@@ -98,11 +98,11 @@ export default function ForgotPasswordPage() {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 to-indigo-100 p-4">
+    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-[var(--brand-surface-from)] to-[var(--brand-surface-to)] p-4">
       <Card className="w-full max-w-md">
         <CardHeader className="text-center">
-          <div className="mx-auto w-12 h-12 bg-blue-100 rounded-full flex items-center justify-center mb-4">
-            <Mail className="w-6 h-6 text-blue-600" />
+          <div className="mx-auto w-12 h-12 bg-[var(--brand-tint)] rounded-full flex items-center justify-center mb-4">
+            <Mail className="w-6 h-6 text-[var(--brand-accent)]" />
           </div>
           <CardTitle className="text-xl text-gray-900">Password Dimenticata?</CardTitle>
           <CardDescription className="text-sm text-gray-600">

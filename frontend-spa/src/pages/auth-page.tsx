@@ -189,7 +189,7 @@ export default function AuthPage() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center p-2 sm:p-4">
+    <div className="min-h-screen bg-gradient-to-br from-[var(--brand-surface-from)] to-[var(--brand-surface-to)] flex items-center justify-center p-2 sm:p-4">
       <div className="w-full max-w-6xl grid grid-cols-1 lg:grid-cols-2 gap-4 lg:gap-8 items-center">
         {/* Hero Section - Hidden on mobile, visible on desktop */}
         <div className="hidden lg:block space-y-8 text-left">
@@ -294,7 +294,7 @@ export default function AuthPage() {
                     googleEnabled={googleEnabled}
                   />
                   <div className="mt-1 text-right">
-                    <Link href="/auth/forgot-password" className="text-sm text-blue-700 hover:underline">
+                    <Link href="/auth/forgot-password" className="text-sm text-[var(--brand-accent-strong)] hover:underline">
                       Password dimenticata?
                     </Link>
                   </div>

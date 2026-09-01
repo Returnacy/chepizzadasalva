@@ -283,7 +283,7 @@ export default function TeamPage() {
                   onClick={() => chooseRole(r)}
                   disabled={patchMutation.isPending}
                   className={`w-full rounded-md border px-4 py-3 flex items-center justify-between transition-colors disabled:opacity-60 ${
-                    highlight ? 'border-brand-blue bg-blue-50' : 'border-gray-200 hover:bg-gray-50'
+                    highlight ? 'border-brand-blue bg-[var(--brand-surface-from)]' : 'border-gray-200 hover:bg-gray-50'
                   }`}
                 >
                   <span className="font-medium text-gray-900">{ROLE_LABELS[r]}</span>
