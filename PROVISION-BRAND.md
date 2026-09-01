@@ -460,14 +460,27 @@ VITE_PM_URL=<PizzeriaManager del cliente>
 Il colore è **un solo token**, non un tema. `VITE_BRAND_PRIMARY` sostituisce il
 blu Che Pizza (bottoni, icone, bordi, gradiente della carta fedeltà);
 `VITE_BRAND_PRIMARY_DARK` è la tinta scura di hover/tab attivo e, se non dichiarata,
-viene derivata abbassando la luminosità di 28 punti. Tutto il resto — impaginazione,
-scala neutra, crema di sfondo, rosso distruttivo, palette dei grafici — è identico
-per ogni cliente di proposito. **Limite noto**, scritto per esteso in
-`src/config/theme.ts`: una sessantina di classi usano ancora i blu di serie di
-Tailwind (`from-blue-50 to-indigo-100` di sfondo pagina, tinte informative, link
-delle pagine legali) e non seguono il token. Un brand lontano dal blu si trova le
-proprie schermate su un fondo appena azzurro. Sistemarlo significa toccarle tutte:
-decisione da prendere, non da subire in silenzio.
+viene derivata abbassando la luminosità di 28 punti.
+
+Dal primary vengono derivate anche le **tinte chiare**: sfondo pagina
+(`--brand-surface-from` / `-to`), pannelli informativi (`--brand-tint`,
+`--brand-tint-border`), link e testo su quelle tinte (`--brand-accent`,
+`--brand-accent-strong`, `--brand-ink`). Due cose da sapere, entrambe spiegate
+per esteso in `src/config/theme.ts`:
+
+- gli accent vengono **scuriti finché non superano 4,5:1 su bianco** (5,5:1 per
+  `-strong`, 7:1 per l'ink). Un brand caldo (arancio, giallo) ottiene quindi un
+  accent visibilmente più scuro di uno freddo: è voluto — la luminosità HSL non
+  è leggibilità, e un link arancio "alla blue-600" sta sotto 3:1;
+- lo sfondo pagina resta **chiaro per ogni brand**, anche per un cliente la cui
+  identità è scura (la card di Qui è Ora è bruno quasi nero e va benissimo così).
+  Non esiste un tema dark e non va inventato qui.
+
+Tutto il resto è identico per ogni cliente di proposito: impaginazione, scala
+neutra, crema di sfondo, rosso distruttivo, palette dei grafici, e i **set di
+colori che portano significato** — badge dei ruoli, canali delle campagne, le tre
+icone della hero di login, i chip dei filtri CRM. Ricolorare un solo membro di un
+set con la tinta del brand distrugge il set.
 
 ### 6.3 Il build fallisce se la configurazione è incompleta
 
