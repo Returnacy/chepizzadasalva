@@ -268,13 +268,13 @@ export default function AuthPage() {
                 <TabsList className="grid w-full grid-cols-2 relative bg-gray-100 p-1 rounded-lg h-9">
                   <TabsTrigger
                     value="login"
-                    className="relative z-10 data-[state=active]:bg-[#27496D] data-[state=active]:text-white data-[state=active]:shadow-sm transition-all duration-200 bg-white text-gray-600 text-sm"
+                    className="relative z-10 data-[state=active]:bg-[hsl(var(--brand-dark))] data-[state=active]:text-white data-[state=active]:shadow-sm transition-all duration-200 bg-white text-gray-600 text-sm"
                   >
                     Accedi
                   </TabsTrigger>
                   <TabsTrigger
                     value="register"
-                    className="relative z-10 data-[state=active]:bg-[#27496D] data-[state=active]:text-white data-[state=active]:shadow-sm transition-all duration-200 bg-white text-gray-600 text-sm"
+                    className="relative z-10 data-[state=active]:bg-[hsl(var(--brand-dark))] data-[state=active]:text-white data-[state=active]:shadow-sm transition-all duration-200 bg-white text-gray-600 text-sm"
                   >
                     Registrati
                   </TabsTrigger>

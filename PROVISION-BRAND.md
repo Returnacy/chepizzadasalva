@@ -250,6 +250,7 @@ Mai inventati. Senza questi il build fallisce (§6.3):
 | Ragione sociale, sede legale, C.F., P. IVA | pagine Termini e Privacy |
 | Email di contatto privacy/ToS | pagine legali |
 | Nome commerciale + logo (PNG/SVG orizzontale) | SPA |
+| Colore brand `#RRGGBB` (dal logo o dal brand book) | SPA — senza, il sito del cliente resta blu Che Pizza |
 | Indirizzo e telefono della pizzeria | record `Business` |
 | Premi e soglie timbri (es. "Pizza omaggio a 10") | seed premi |
 | Email del titolare | primo ADMIN |
@@ -412,16 +413,24 @@ Cloudflare autorileva **pnpm** (`pnpm-lock.yaml` è canonico).
 
 ### 6.2 Variabili di build
 
+Nessun valore di esempio: i dati del cliente si copiano da
+`PizzeriaOS/clients/<slug>/spa-env.md`, che li tiene già compilati e marca con
+`{{...}}` quelli non ancora ricevuti. Un esempio plausibile in un runbook prima o
+poi finisce incollato in un progetto Pages vero.
+
 ```
-VITE_BRAND_NAME=Pizzeria Sud Est
-VITE_BRAND_FULL_NAME=Pizzeria Sud Est
-VITE_BRAND_LEGAL_NAME=Sud Est S.r.l.
-VITE_BRAND_LEGAL_ADDRESS=Via Roma 1, 35100 Padova (PD)
+VITE_BRAND_NAME=<nome commerciale>
+VITE_BRAND_FULL_NAME=<nome esteso, default: VITE_BRAND_NAME>
+VITE_BRAND_DOCUMENT_TITLE=<titolo della scheda browser>
+VITE_BRAND_LEGAL_NAME=<ragione sociale>
+VITE_BRAND_LEGAL_ADDRESS=<sede legale>
 VITE_BRAND_LEGAL_TAX_CODE=<C.F. del cliente>
 VITE_BRAND_LEGAL_VAT=<P. IVA del cliente>
-VITE_BRAND_CONTACT_EMAIL=privacy@sudest.it
-VITE_BRAND_LOGO_URL=<URL assoluto del logo>      # vuoto → logo Che Pizza incluso nel bundle
-VITE_BRAND_DOCUMENT_TITLE=Sud Est — Fidelity
+VITE_BRAND_CONTACT_EMAIL=<email contatto privacy/ToS>
+VITE_BRAND_LOGO_URL=<URL assoluto del logo>       # vuoto → logo Che Pizza nel bundle
+VITE_BRAND_PRIMARY=<#RRGGBB>                      # vuoto → blu Che Pizza
+VITE_BRAND_PRIMARY_DARK=<#RRGGBB>                 # opzionale: derivato da PRIMARY se assente
+VITE_BRAND_ID=<BRAND_ID>
 VITE_BUSINESS_ID=<BUSINESS_ID>
 VITE_USER_SERVICE_URL=https://user.returnacy.app
 VITE_BUSINESS_SERVICE_URL=https://<slug>.business.returnacy.app
@@ -429,26 +438,45 @@ VITE_CAMPAIGN_SERVICE_URL=<campaign-service>      # campagne congelate: può res
 VITE_PM_URL=<PizzeriaManager del cliente>
 ```
 
+Il colore è **un solo token**, non un tema. `VITE_BRAND_PRIMARY` sostituisce il
+blu Che Pizza (bottoni, icone, bordi, gradiente della carta fedeltà);
+`VITE_BRAND_PRIMARY_DARK` è la tinta scura di hover/tab attivo e, se non dichiarata,
+viene derivata abbassando la luminosità di 28 punti. Tutto il resto — impaginazione,
+scala neutra, crema di sfondo, rosso distruttivo, palette dei grafici — è identico
+per ogni cliente di proposito. **Limite noto**, scritto per esteso in
+`src/config/theme.ts`: una sessantina di classi usano ancora i blu di serie di
+Tailwind (`from-blue-50 to-indigo-100` di sfondo pagina, tinte informative, link
+delle pagine legali) e non seguono il token. Un brand lontano dal blu si trova le
+proprie schermate su un fondo appena azzurro. Sistemarlo significa toccarle tutte:
+decisione da prendere, non da subire in silenzio.
+
 ### 6.3 Il build fallisce se la configurazione è incompleta
 
 `prebuild` esegue `scripts/check-brand.mjs`, che blocca:
 - qualunque `VITE_*` con placeholder residuo (`{{...}}`, `TODO`, `CHANGEME`, `XXX`);
-- un brand diverso da Che Pizza che **eredita** ragione sociale, P. IVA, C.F. o
-  email di Che Pizza (il caso pericoloso: pubblicare l'identità legale di un
-  cliente sul sito di un altro).
+- un `VITE_BRAND_PRIMARY`/`_DARK` che non è un `#RRGGBB` valido (la SPA lo
+  ignorerebbe in silenzio e resterebbe blu Che Pizza);
+- un brand diverso da Che Pizza che **eredita** ragione sociale, sede legale,
+  P. IVA, C.F., email o colore di Che Pizza, o che lascia vuoti logo, colore,
+  `VITE_BUSINESS_ID`, gli URL dei servizi o `VITE_PM_URL` (il caso pericoloso:
+  pubblicare l'identità legale di un cliente sul sito di un altro, o far leggere
+  al cliente il contatore di Che Pizza);
+- qualunque `VITE_*` che contenga un host `chepizzadasalva` o un id di Che Pizza
+  (brandId, businessId Taggi o Lissaro), in qualsiasi variabile si sia infilato.
 
 Provarlo in locale prima di configurare Cloudflare:
 
 ```bash
 cd chepizzadasalva/frontend-spa
-VITE_BRAND_NAME='Pizzeria Sud Est' pnpm check:brand   # deve fallire elencando ciò che manca
+VITE_BRAND_NAME='<nome del cliente>' pnpm check:brand   # deve fallire elencando ciò che manca
 ```
 
 Poi: custom domain `<slug>.returnacy.app` → CNAME su Porkbun (§2).
 
 > Il logo: se `VITE_BRAND_LOGO_URL` è vuoto viene servito quello di Che Pizza
-> incluso nel bundle. Per un cliente **è obbligatorio** valorizzarlo (il check non
-> può accorgersene: un URL vuoto è legittimo per Che Pizza).
+> incluso nel bundle. Per un brand diverso da Che Pizza il check ora lo pretende,
+> ma può solo vedere che la variabile è valorizzata: che l'URL risponda davvero e
+> mostri il logo giusto va guardato con gli occhi dopo il primo deploy.
 
 ---
 

@@ -13,8 +13,8 @@ export function LoyaltyCard({ stamps, maxStamps = 15, className = "" }: LoyaltyC
   return (
     <div className={`bg-gradient-to-br from-brand-blue to-brand-dark rounded-2xl p-6 text-white ${className}`}>
       <div className="mb-4">
-        <h3 className="text-lg font-bold text-[#27496D]">Carta Fedeltà</h3>
-        <p className="text-sm font-medium text-[#27496D]">Raccogli {maxStamps} timbri per un premio speciale!</p>
+        <h3 className="text-lg font-bold text-brand-dark">Carta Fedeltà</h3>
+        <p className="text-sm font-medium text-brand-dark">Raccogli {maxStamps} timbri per un premio speciale!</p>
       </div>
       {/* Progress Bar */}
       <div className="w-full bg-brand-dark rounded-full h-3 mb-4">
