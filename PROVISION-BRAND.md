@@ -167,16 +167,35 @@ suo `businessId` è una sede del brand. Va però saputo:
 | `PATCH .../memberships` cross-brand | 200 | **403 `CROSS_TENANT_FORBIDDEN`** |
 | `POST $BS/api/v1/stamps` con businessId fuori brand | 200 | **400** |
 | `GET $BS/api/v1/coupons?userId=<altro>` da cliente | 200 | **403** |
+| `GET $US/api/v1/me` con token di servizio `business-service:<slug>` | 200 + riga `User` fantasma | **403 `SERVICE_TOKEN_NOT_ALLOWED`** |
 
 Il `400 NO_MEMBERSHIPS` è nuovo: prima un array vuoto restituiva `200` senza far
 nulla. Nessun chiamante noto lo invia — la SPA manda sempre almeno una entry —
 ma è un cambio di contratto da conoscere se qualcosa di esterno chiama
 quell'endpoint.
 
+L'ultima riga è la correzione di `isServiceCaller` (`utils/serviceCallerGuard.ts`):
+riconosceva un id di servizio **solo per corrispondenza esatta**, mentre dal §8.1
+in poi ogni brand nuovo si chiama `business-service:<slug>`. Con
+`INTERNAL_SERVICE_CLIENTS` assente o non parsabile quel `sub` non stava in nessuna
+lista, `/me` lo prendeva per una persona e l'upsert a monte creava una riga `User`
+intestata al client id — esattamente ciò che quella guardia esiste per impedire.
+Ora il match è sul segmento prima di `:` oltre che sull'id intero, come già fanno
+`tenantGuard.matchesAllowedService` e `evaluateTenantAccess` del business-service.
+Nessun impatto sui token utente: il `sub` di una persona è un uuid, non contiene `:`.
+Su Che Pizza, che usa ancora l'id legacy `business-service`, il comportamento è
+identico a prima.
+
 #### Passo 2 — deploy `user-service`
 
 Merge di `feat/tenant-scoped-authz` → deploy Railway. **Nessuna migrazione DB**:
 il branch non cambia lo schema.
+
+Nello stesso deploy va anche la correzione di `isServiceCaller` (branch
+`feat/spa-brand-tokens`, vedi §1d): non è un prerequisito per Che Pizza — che non
+ha ancora credenziali per-tenant — ma deve essere in produzione **prima** del §8.1
+del primo brand nuovo, altrimenti il suo business-service può farsi passare per un
+utente su `/me`. Coperta da `server/tests/serviceCallerGuard.test.ts`.
 
 Env da NON toccare qui: lasciare `INTERNAL_SERVICE_CLIENTS` invariata (la
 rotazione è il §8, separata) e **non** impostare `REQUIRE_TENANT_SERVICE_TOKENS`
