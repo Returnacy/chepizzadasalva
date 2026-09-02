@@ -15,7 +15,14 @@
  *     number and privacy contact under its own logo. That is the dangerous
  *     case, and it is the one this check is really for.
  *
- *  3. Shipping a client's site still wearing Che Pizza's face or pointing at
+ *  3. Shipping a client's site with a "Accedi con Google" button that cannot
+ *     work. VITE_GOOGLE_CLIENT_ID is committed and is Che Pizza's OAuth client,
+ *     so it reaches every brand's build; Google rejects it from any origin it
+ *     has not been told about. The button is therefore off unless
+ *     VITE_GOOGLE_LOGIN_ENABLED=true — and this check refuses any other value,
+ *     because a typo would silently mean "off".
+ *
+ *  4. Shipping a client's site still wearing Che Pizza's face or pointing at
  *     Che Pizza's data: the bundled Che Pizza logo (the fallback when
  *     VITE_BRAND_LOGO_URL is empty), Che Pizza's blue (the fallback when
  *     VITE_BRAND_PRIMARY is unset), a chepizzadasalva.it host, or Che Pizza's
@@ -91,7 +98,13 @@ for (const key of ['VITE_BRAND_PRIMARY', 'VITE_BRAND_PRIMARY_DARK']) {
   }
 }
 
-// 3. If this is not Che Pizza's build, nothing may fall back to Che Pizza's.
+// 3. Google login is a tri-state switch and typos must not read as "off".
+const googleLoginEnabled = (env.VITE_GOOGLE_LOGIN_ENABLED ?? '').trim();
+if (googleLoginEnabled !== '' && googleLoginEnabled !== 'true' && googleLoginEnabled !== 'false') {
+  errors.push(`VITE_GOOGLE_LOGIN_ENABLED must be "true" or "false" (or unset), got "${googleLoginEnabled}"`);
+}
+
+// 4. If this is not Che Pizza's build, nothing may fall back to Che Pizza's.
 const brandName = (env.VITE_BRAND_NAME ?? '').trim();
 const isChePizza = brandName === '' || brandName === CHE_PIZZA_DEFAULTS.VITE_BRAND_NAME;
 
@@ -127,4 +140,8 @@ if (errors.length > 0) {
   process.exit(1);
 }
 
+// Mirrors isGoogleLoginEnabled() in src/lib/brand-flags.ts: Che Pizza's own
+// build keeps the button, everyone else has to ask for it.
+const googleLoginOn = googleLoginEnabled === 'true' || isChePizza;
 console.log(`✔ Brand configuration OK (${isChePizza ? 'Che Pizza (defaults)' : brandName})`);
+console.log(`  Google login: ${googleLoginOn ? 'on' : 'off (button hidden)'}`);

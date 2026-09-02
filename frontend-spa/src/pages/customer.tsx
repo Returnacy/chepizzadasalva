@@ -54,6 +54,10 @@ export default function CustomerPage() {
     staleTime: 5 * 60_000,
   });
 
+  // The whole Google Wallet block is hidden unless the business-service has
+  // answered that it can actually issue passes. Unanswered (still loading, or
+  // the call failed) counts as "no": a button that 502s is worse than none.
+  const walletAvailable = walletStatusQuery.data?.configured === true;
   const walletLinked = walletStatusQuery.data?.linked ?? false;
 
   // Fetch coupons directly from chepizza (the source of truth) rather than
@@ -152,7 +156,7 @@ export default function CustomerPage() {
       return await createGoogleWalletPass({ qrCode });
     },
   onSuccess: (pass: { saveUrl: string; jwt: string; objectId: string; classId: string; expiresAt: string }) => {
-      queryClient.setQueryData(['walletStatus', businessId], { linked: true, objectId: pass.objectId ?? null });
+      queryClient.setQueryData(['walletStatus', businessId], { configured: true, linked: true, objectId: pass.objectId ?? null });
     },
   });
 
@@ -348,7 +352,7 @@ export default function CustomerPage() {
               <QRCode value={userData?.id || ""} size={200} />
             </div>
           </CardContent>
-          {!walletLinked && (
+          {walletAvailable && !walletLinked && (
             <CardContent className="pt-0">
               <div className="flex flex-col items-center gap-2">
                 <Button
@@ -377,7 +381,7 @@ export default function CustomerPage() {
               </div>
             </CardContent>
           )}
-          {walletLinked && (
+          {walletAvailable && walletLinked && (
             <CardContent className="pt-0">
               <p className="text-sm text-gray-500 text-center">
                 Carta già collegata con Google Wallet.

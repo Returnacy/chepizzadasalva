@@ -37,7 +37,7 @@
     "zod": "^4.0.17"
   },
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1",
+    "test": "vitest run",
     "dev": "npx vite",
     "check:brand": "node scripts/check-brand.mjs",
     "prebuild": "node scripts/check-brand.mjs",
@@ -51,15 +51,18 @@
   "type": "module",
   "devDependencies": {
     "@tailwindcss/typography": "^0.5.16",
+    "@testing-library/react": "^14.3.1",
     "@types/node": "^24.3.0",
     "@types/react": "^18.3.11",
     "@types/react-dom": "^18.3.1",
     "@vitejs/plugin-react": "^5.0.0",
     "autoprefixer": "^10.4.20",
+    "jsdom": "^25.0.1",
     "postcss": "^8.4.47",
     "prettier": "^3.5.3",
     "tailwindcss": "^3.4.17",
     "typescript": "^5.9.2",
-    "vite": "^5.4.14"
+    "vite": "^5.4.14",
+    "vitest": "^2.1.9"
   }
 }

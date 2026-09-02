@@ -13,6 +13,7 @@ import { RegisterForm } from '../features/auth/components/RegisterForm';
 import { useToast } from '../hooks/use-toast';
 import { tokenService } from '../lib/token-service';
 import { BRAND } from '../config/brand';
+import { getGoogleClientId, isGoogleLoginEnabled } from '../lib/brand-flags';
 
 export default function AuthPage() {
   const [, setLocation] = useLocation();
@@ -21,13 +22,10 @@ export default function AuthPage() {
 
   // Method toggles now managed via custom hook (removed local duplicates)
 
-  const googleClientId = (import.meta as any).env?.VITE_GOOGLE_CLIENT_ID || (import.meta as any).env?.GOOGLE_CLIENT_ID;
-  if (!googleClientId) {
-    // One-time debug to help diagnose missing env variable in deployment
-    // eslint-disable-next-line no-console
-    console.warn('Google Client ID not found in env (VITE_GOOGLE_CLIENT_ID).');
-  }
-  const googleEnabled = Boolean(googleClientId);
+  const googleClientId = getGoogleClientId();
+  // Off unless this brand's origin has been authorised in the Google console
+  // and the build says so: see src/lib/brand-flags.ts.
+  const googleEnabled = isGoogleLoginEnabled();
   // State for GIS and active tab
   const [gisReady, setGisReady] = useState(false);
   const [activeTab, setActiveTab] = useState('login' as 'login' | 'register');
@@ -291,14 +289,15 @@ export default function AuthPage() {
                     loading={loginMutation.isPending}
                     googleLoading={!gisReady}
                     googleError={null}
-                    googleEnabled={googleEnabled}
                   />
                   <div className="mt-1 text-right">
                     <Link href="/auth/forgot-password" className="text-sm text-[var(--brand-accent-strong)] hover:underline">
                       Password dimenticata?
                     </Link>
                   </div>
-                  <div className="mt-2"><div id="google-login-btn" className="flex justify-center" /></div>
+                  {googleEnabled && (
+                    <div className="mt-2"><div id="google-login-btn" className="flex justify-center" /></div>
+                  )}
                 </TabsContent>
 
                 {/* Register Tab */}
@@ -310,7 +309,9 @@ export default function AuthPage() {
                     loading={registerMutation.isPending}
                     googleError={null}
                   />
-                  <div className="mt-2"><div id="google-signup-btn" className="flex justify-center" /></div>
+                  {googleEnabled && (
+                    <div className="mt-2"><div id="google-signup-btn" className="flex justify-center" /></div>
+                  )}
                 </TabsContent>
               </Tabs>
             </CardContent>

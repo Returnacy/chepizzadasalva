@@ -1,4 +1,5 @@
 import { useCallback, useRef, useState } from 'react';
+import { isGoogleLoginEnabled } from '../lib/brand-flags';
 
 declare global {
   interface Window { google?: any; }
@@ -36,10 +37,15 @@ interface SignInOptions {
   timeoutMs?: number;            // timeout for interactive flow; defaults to 120s
 }
 
-export function useGoogleAuth(clientId: string | undefined) {
+export function useGoogleAuth(configuredClientId: string | undefined) {
+  // Same gate as the button in auth-page: on a brand whose origin Google does
+  // not know, initialising GIS or firing One Tap can only produce an error, so
+  // the hook behaves exactly as if no client id had been supplied.
+  const googleEnabled = isGoogleLoginEnabled();
+  const clientId = googleEnabled ? configuredClientId : undefined;
   const [loading, setLoading] = useState(false);        // interactive-only loading
   const [error, setError] = useState<Error | null>(null);
-  const enableOneTap = ((import.meta as any).env?.VITE_GOOGLE_ONE_TAP ?? 'false') === 'true';
+  const enableOneTap = googleEnabled && ((import.meta as any).env?.VITE_GOOGLE_ONE_TAP ?? 'false') === 'true';
 
   const inflight = useRef<Promise<string> | null>(null);
   const oneTapTried = useRef(false);

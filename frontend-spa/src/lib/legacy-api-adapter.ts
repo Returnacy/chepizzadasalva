@@ -224,22 +224,25 @@ export async function createGoogleWalletPass(options: { businessId?: string; qrC
   }
 }
 
-export async function getGoogleWalletStatus(options: { businessId?: string } = {}): Promise<{ linked: boolean; objectId: string | null }> {
+export async function getGoogleWalletStatus(options: { businessId?: string } = {}): Promise<{ configured: boolean; linked: boolean; objectId: string | null }> {
   try {
     const businessId = options.businessId || getBusinessId();
     if (!businessId) {
       throw new Error('businessId is required to query Google Wallet status');
     }
     const response = await businessHttp.get<any>(`/api/v1/wallet/google?businessId=${encodeURIComponent(businessId)}`);
-    const payload = (response?.data ?? response) as { linked?: boolean; objectId?: string | null };
+    const payload = (response?.data ?? response) as { linked?: boolean; objectId?: string | null; configured?: boolean };
     return {
+      // A business-service that predates the flag never says "not configured",
+      // and on those deployments Wallet is set up — so absent means yes.
+      configured: payload?.configured !== false,
       linked: !!payload?.linked,
       objectId: typeof payload?.objectId === 'string' ? payload.objectId : null,
     };
   } catch (error) {
     // Treat 404/403 as not linked for UI purposes
     if ((error as any)?.status === 403 || (error as any)?.status === 404) {
-      return { linked: false, objectId: null };
+      return { configured: true, linked: false, objectId: null };
     }
     throw normalizeError(error);
   }

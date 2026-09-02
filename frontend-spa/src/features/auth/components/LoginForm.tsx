@@ -13,10 +13,9 @@ interface Props {
   loading: boolean;
   googleLoading: boolean;
   googleError?: Error | null;
-  googleEnabled?: boolean;
 }
 
-export function LoginForm({ form, onSubmit, loginMethod, toggleMethod, onGoogle, loading, googleLoading, googleError, googleEnabled = true }: Props) {
+export function LoginForm({ form, onSubmit, loginMethod, toggleMethod, onGoogle, loading, googleLoading, googleError }: Props) {
   return (
     <Form {...form}>
       <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-3">
@@ -48,9 +47,6 @@ export function LoginForm({ form, onSubmit, loginMethod, toggleMethod, onGoogle,
             {loginMethod==='password' ? (loading ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Accesso...</> : 'Accedi') : 'Accedi'}
           </Button>
         </div>
-        {!googleEnabled && (
-          <p className="text-xs text-gray-500"></p>
-        )}
         {googleError && loginMethod==='google' && (
           <div className="flex items-start gap-2 text-amber-600 text-sm">
             <AlertCircle className="w-4 h-4 mt-0.5" />
