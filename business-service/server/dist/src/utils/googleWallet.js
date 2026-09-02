@@ -11,6 +11,33 @@ function readEnv(name, fallback) {
         return fallback;
     throw new Error(`${name} is required to issue Google Wallet passes`);
 }
+// The env a brand must set before Google Wallet can work at all. Everything
+// else in getWalletConfig() has a default.
+const REQUIRED_WALLET_ENV = [
+    'GOOGLE_WALLET_LOYALTY_CLASS_ID',
+    'GOOGLE_WALLET_SERVICE_ACCOUNT_EMAIL',
+    'GOOGLE_WALLET_PRIVATE_KEY',
+];
+function hasEnv(name) {
+    const value = process.env[name];
+    return typeof value === 'string' && value.trim().length > 0;
+}
+/**
+ * Whether this deployment can issue Google Wallet passes, answered WITHOUT
+ * throwing (readEnv does throw). A brand provisioned without the Wallet env is
+ * a normal, supported state: the SPA asks this so it can leave the "Add to
+ * Google Wallet" button out entirely instead of showing one that 500s.
+ */
+export function isWalletConfigured() {
+    if (!REQUIRED_WALLET_ENV.every(hasEnv))
+        return false;
+    // The issuer id is normally the part of the class id before the dot; only a
+    // class id without one makes GOOGLE_WALLET_ISSUER_ID mandatory.
+    const classId = process.env.GOOGLE_WALLET_LOYALTY_CLASS_ID.trim();
+    if (!classId.includes('.') && !hasEnv('GOOGLE_WALLET_ISSUER_ID'))
+        return false;
+    return true;
+}
 function getWalletConfig() {
     const classId = readEnv('GOOGLE_WALLET_LOYALTY_CLASS_ID');
     const issuerId = (() => {

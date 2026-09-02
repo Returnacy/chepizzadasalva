@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { createLoyaltySaveJwt } from '../utils/googleWallet.js';
+import { createLoyaltySaveJwt, isWalletConfigured } from '../utils/googleWallet.js';
 import { TokenService } from '../services/tokenService.js';
 import { UserServiceClient } from '../services/userServiceClient.js';
 const requestSchema = z.object({
@@ -71,6 +71,13 @@ export function registerWalletRoutes(app) {
                 if (!parsedQuery.success || !parsedQuery.data.businessId) {
                     return reply.status(400).send({ error: 'INVALID_QUERY', message: 'businessId is required' });
                 }
+                // Brands provisioned without the Google Wallet env are a supported
+                // state, not an error: answer before spending a user-service round
+                // trip so the SPA can drop the button instead of rendering one that
+                // can only fail.
+                if (!isWalletConfigured()) {
+                    return reply.send({ configured: false, linked: false, objectId: null });
+                }
                 const profile = await fetchProfile(request);
                 if (!profile || typeof profile !== 'object' || !profile.id) {
                     return reply.status(401).send({ error: 'UNAUTHENTICATED' });
@@ -84,7 +91,7 @@ export function registerWalletRoutes(app) {
                 try {
                     const userClient = createUserServiceClient();
                     const status = await userClient.getWalletPass(profile.id, businessId);
-                    return reply.send({ linked: !!status?.linked, objectId: status?.objectId ?? null });
+                    return reply.send({ configured: true, linked: !!status?.linked, objectId: status?.objectId ?? null });
                 }
                 catch (error) {
                     if (request?.server?.log?.error) {
@@ -115,6 +122,9 @@ export function registerWalletRoutes(app) {
                         error: 'INVALID_PAYLOAD',
                         details: parseResult.error.flatten(),
                     });
+                }
+                if (!isWalletConfigured()) {
+                    return reply.status(409).send({ error: 'WALLET_NOT_CONFIGURED' });
                 }
                 const { businessId, qrCode } = parseResult.data;
                 const profile = await fetchProfile(request);
