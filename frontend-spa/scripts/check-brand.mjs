@@ -2,7 +2,7 @@
 /**
  * Build-time guard on per-brand configuration.
  *
- * Three failure modes it exists to prevent:
+ * The failure modes it exists to prevent:
  *
  *  1. Shipping a client's site with placeholders still in it
  *     ({{RAGIONE_SOCIALE}}, TODO, XXX). Legal text must come from the client;
@@ -29,6 +29,17 @@
  *     brand/business ids — servicesHttp.ts falls back to the Taggi businessId,
  *     so an unset VITE_BUSINESS_ID makes a client's SPA read Che Pizza's
  *     counter.
+ *
+ *  5. A HALF-IMPORTED brand config reading as "this is Che Pizza's build".
+ *     Every check in (2) and (4) hangs off VITE_BRAND_NAME: if it is empty the
+ *     build is taken to be Che Pizza's own and nothing is verified. That is
+ *     exactly what happened to the sudest Pages project on 2 Sep 2026 — the
+ *     Cloudflare bulk env import silently DROPS values containing spaces
+ *     (VITE_BRAND_NAME among them) and reads a leading '#' as a comment, so a
+ *     build carrying the client's brandId, logo and legal data but no name
+ *     went green and published Che Pizza's identity. So: an empty
+ *     VITE_BRAND_NAME with any other brand variable set is now an error, not
+ *     a Che Pizza build.
  *
  * Runs as `prebuild`, so `pnpm build` cannot skip it. Cloudflare Pages passes
  * its project env into the build, so the same check runs there.
@@ -104,8 +115,29 @@ if (googleLoginEnabled !== '' && googleLoginEnabled !== 'true' && googleLoginEna
   errors.push(`VITE_GOOGLE_LOGIN_ENABLED must be "true" or "false" (or unset), got "${googleLoginEnabled}"`);
 }
 
-// 4. If this is not Che Pizza's build, nothing may fall back to Che Pizza's.
+// 4. An empty VITE_BRAND_NAME means "Che Pizza's own build" — but only if the
+// env carries nothing else of a brand. Anything else set is a partial import
+// (see failure mode 5), and taking it for Che Pizza would skip every check
+// below AND publish Che Pizza's identity under the client's project.
 const brandName = (env.VITE_BRAND_NAME ?? '').trim();
+const partialBrandKeys = Object.keys(env)
+  .filter((key) => key !== 'VITE_BRAND_NAME')
+  .filter((key) => key.startsWith('VITE_BRAND_') || key === 'VITE_BUSINESS_ID')
+  .filter((key) => (env[key] ?? '').trim() !== '')
+  .sort();
+
+if (brandName === '' && partialBrandKeys.length > 0) {
+  errors.push(
+    `partial brand configuration: VITE_BRAND_NAME is missing while ${partialBrandKeys.length} ` +
+      `brand variable(s) are set (${partialBrandKeys.join(', ')}). ` +
+      'Without VITE_BRAND_NAME this build publishes Che Pizza\'s identity. ' +
+      'Likely cause: the Cloudflare bulk env import dropped the values containing ' +
+      'spaces — re-import from PizzeriaOS/clients/<slug>/pages.env, where every ' +
+      'value is double-quoted.',
+  );
+}
+
+// 5. If this is not Che Pizza's build, nothing may fall back to Che Pizza's.
 const isChePizza = brandName === '' || brandName === CHE_PIZZA_DEFAULTS.VITE_BRAND_NAME;
 
 if (!isChePizza) {
