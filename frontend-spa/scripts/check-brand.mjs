@@ -120,10 +120,18 @@ if (googleLoginEnabled !== '' && googleLoginEnabled !== 'true' && googleLoginEna
 // (see failure mode 5), and taking it for Che Pizza would skip every check
 // below AND publish Che Pizza's identity under the client's project.
 const brandName = (env.VITE_BRAND_NAME ?? '').trim();
+// Che Pizza's own Pages project may legitimately carry its own ids/values
+// (e.g. VITE_BUSINESS_ID = the Taggi businessId): those are not "another brand".
+const isChePizzaOwnValue = (key, value) => {
+  const v = value.toLowerCase();
+  if (CHE_PIZZA_DEFAULTS[key] && v === CHE_PIZZA_DEFAULTS[key].toLowerCase()) return true;
+  return CHE_PIZZA_MARKERS.some(([marker]) => v.includes(marker.toLowerCase()));
+};
 const partialBrandKeys = Object.keys(env)
   .filter((key) => key !== 'VITE_BRAND_NAME')
   .filter((key) => key.startsWith('VITE_BRAND_') || key === 'VITE_BUSINESS_ID')
   .filter((key) => (env[key] ?? '').trim() !== '')
+  .filter((key) => !isChePizzaOwnValue(key, env[key].trim()))
   .sort();
 
 if (brandName === '' && partialBrandKeys.length > 0) {
