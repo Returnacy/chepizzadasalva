@@ -13,7 +13,7 @@ import { RegisterForm } from '../features/auth/components/RegisterForm';
 import { useToast } from '../hooks/use-toast';
 import { tokenService } from '../lib/token-service';
 import { BRAND } from '../config/brand';
-import { getGoogleClientId, isGoogleLoginEnabled } from '../lib/brand-flags';
+import { getGoogleClientId, isChePizzaBuild, isGoogleLoginEnabled } from '../lib/brand-flags';
 
 export default function AuthPage() {
   const [, setLocation] = useLocation();
@@ -224,7 +224,10 @@ export default function AuthPage() {
               <h3 className="font-semibold text-gray-900 mb-2">
                 Premi fedeltà
               </h3>
-              <p className="text-sm text-gray-600">18 punti = pizza gratuita</p>
+              <p className="text-sm text-gray-600">
+                {/* Che Pizza's own prize; other brands' rewards come from their Prize rows. */}
+                {isChePizzaBuild() ? '18 punti = pizza gratuita' : 'Raccogli timbri e ricevi premi'}
+              </p>
             </div>
 
             <div className="bg-white p-6 rounded-2xl shadow-lg">
