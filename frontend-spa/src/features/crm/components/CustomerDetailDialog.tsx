@@ -65,9 +65,9 @@ export function CustomerDetailDialog({ customer, onClose, onAddStamps, onRedeemC
           </div>
           <Card>
             <CardContent className="p-4">
-              <div className="flex items-center justify-between mb-2"><span className="text-sm font-medium">Progresso Prossima Pizza</span><span className="text-sm text-gray-600">{remainder}/{cycleSize}</span></div>
+              <div className="flex items-center justify-between mb-2"><span className="text-sm font-medium">Progresso: {customer.nextPrizeName || 'Prossimo premio'}</span><span className="text-sm text-gray-600">{remainder}/{cycleSize}</span></div>
               <div className="w-full bg-gray-200 rounded-full h-2"><div className="bg-blue-600 h-2 rounded-full transition-all" style={{ width: `${progressPercent}%` }} /></div>
-              <div className="text-xs text-gray-500 mt-1">{stampsToNext} timbri alla prossima pizza gratuita</div>
+              <div className="text-xs text-gray-500 mt-1">{stampsToNext} timbri al prossimo premio</div>
             </CardContent>
           </Card>
           <div className="space-y-2 pt-2">

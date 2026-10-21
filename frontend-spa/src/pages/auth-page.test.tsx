@@ -91,3 +91,20 @@ describe('AuthPage — Google sign-in slot', () => {
     expect(document.getElementById('google-identity-services')).toBeNull();
   });
 });
+
+describe('AuthPage — loyalty copy', () => {
+  it("keeps Che Pizza's '18 punti = pizza gratuita' on Che Pizza's build", async () => {
+    env.VITE_BRAND_NAME = '';
+
+    const { container } = await renderAuthPage();
+    expect(container.textContent).toContain('18 punti = pizza gratuita');
+  });
+
+  it("does not promise a free pizza on another brand's build", async () => {
+    env.VITE_BRAND_NAME = 'Pizzeria Sud Est';
+
+    const { container } = await renderAuthPage();
+    expect(container.textContent).not.toMatch(/pizza gratuita/i);
+    expect(container.textContent).toContain('Raccogli timbri e ricevi premi');
+  });
+});

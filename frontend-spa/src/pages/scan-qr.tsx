@@ -364,7 +364,7 @@ export default function ScanQRPage() {
       await redeemCouponLegacy(targetId, { override });
       return { code: coupon.code ?? coupon.qrCode ?? String(targetId), isRedeemed: true, redeemedAt: new Date().toISOString() };
     },
-    onSuccess: (redeemedCoupon: { code: string; isRedeemed: boolean; redeemedAt?: string }) => {
+    onSuccess: (redeemedCoupon: { code: string; isRedeemed: boolean; redeemedAt?: string }, variables: { coupon: CouponType; override?: boolean }) => {
       setScannedCoupon((prev: CouponType | null) => {
         if (!prev) return prev;
         return {
@@ -376,7 +376,7 @@ export default function ScanQRPage() {
       queryClient.invalidateQueries({ queryKey: ["/api/analytics/overview"] });
       
       toast({
-        title: "Pizza gratuita riscattata!",
+        title: variables.coupon.prize?.name ? `Coupon riscattato: ${variables.coupon.prize.name}` : "Coupon riscattato!",
         description: "Il coupon è stato utilizzato con successo. Buon appetito! 🍕",
       });
     },
