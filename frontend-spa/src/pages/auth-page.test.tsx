@@ -93,18 +93,12 @@ describe('AuthPage — Google sign-in slot', () => {
 });
 
 describe('AuthPage — loyalty copy', () => {
-  it("keeps Che Pizza's '18 punti = pizza gratuita' on Che Pizza's build", async () => {
-    env.VITE_BRAND_NAME = '';
-
-    const { container } = await renderAuthPage();
-    expect(container.textContent).toContain('18 punti = pizza gratuita');
-  });
-
-  it("does not promise a free pizza on another brand's build", async () => {
-    env.VITE_BRAND_NAME = 'Pizzeria Sud Est';
+  // The page carries no prize copy at all: each brand's rewards come from its
+  // own Prize rows, so the auth page must not promise Che Pizza's free pizza.
+  it.each(['', 'Pizzeria Sud Est'])("never promises a free pizza (VITE_BRAND_NAME=%j)", async (name) => {
+    env.VITE_BRAND_NAME = name;
 
     const { container } = await renderAuthPage();
     expect(container.textContent).not.toMatch(/pizza gratuita/i);
-    expect(container.textContent).toContain('Raccogli timbri e ricevi premi');
   });
 });

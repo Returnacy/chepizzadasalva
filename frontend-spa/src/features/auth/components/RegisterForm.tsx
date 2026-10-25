@@ -5,6 +5,10 @@ import { Loader2, AlertCircle } from 'lucide-react';
 import { UseFormReturn } from 'react-hook-form';
 import { RegistrationFormValues } from '../hooks/useAuthForms';
 
+// Auth sheet field styling (auth-page.tsx): small caps label, warm grey field.
+const fieldLabel = 'text-xs font-semibold uppercase tracking-[0.05em] text-[#6b665d]';
+const fieldInput = 'h-12 rounded-[12px] border-[#e4e0d6] bg-[#f6f4ef] px-[14px] focus-visible:ring-[hsl(var(--brand-blue))] focus-visible:ring-offset-0';
+const ctaButton = 'flex-1 h-12 rounded-[12px] bg-brand-blue hover:bg-brand-dark text-base font-bold text-white shadow-[0_8px_18px_-8px_hsl(var(--brand-blue)/0.7)]';
 
 interface Props {
   form: UseFormReturn<any>;
@@ -38,40 +42,40 @@ export function RegisterForm({ form, onSubmit, signupMethod, loading, googleErro
         // eslint-disable-next-line no-console
         console.log('[RegisterForm] onSubmit called with values', v, 'signupMethod=', signupMethod);
         onSubmit(v);
-      }, handleInvalid)} className="space-y-3">
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+      }, handleInvalid)} className="flex flex-col gap-[14px]">
+        <div className="grid grid-cols-2 gap-[10px]">
           <FormField control={form.control} name="name" render={({ field }) => (
-            <FormItem><FormLabel>Nome</FormLabel><FormControl><Input {...field} type="text" placeholder="Mario" className="h-12" /></FormControl><FormMessage /></FormItem>
+            <FormItem className="space-y-1.5"><FormLabel className={fieldLabel}>Nome</FormLabel><FormControl><Input {...field} type="text" placeholder="Mario" className={fieldInput} /></FormControl><FormMessage /></FormItem>
           )} />
           <FormField control={form.control} name="surname" render={({ field }) => (
-            <FormItem><FormLabel>Cognome</FormLabel><FormControl><Input {...field} type="text" placeholder="Rossi" className="h-12" /></FormControl><FormMessage /></FormItem>
+            <FormItem className="space-y-1.5"><FormLabel className={fieldLabel}>Cognome</FormLabel><FormControl><Input {...field} type="text" placeholder="Rossi" className={fieldInput} /></FormControl><FormMessage /></FormItem>
           )} />
         </div>
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-          <FormField control={form.control} name="email" render={({ field }) => (
-            <FormItem><FormLabel>Email</FormLabel><FormControl><Input {...field} type="email" placeholder="email@esempio.com" className="h-12" /></FormControl><FormMessage /></FormItem>
-          )} />
-          <FormField control={form.control} name="phone" render={({ field }) => (
-            <FormItem><FormLabel>Telefono (opzionale)</FormLabel><FormControl><Input {...field} type="tel" placeholder="+39 1234567890" className="h-12" /></FormControl><FormMessage /></FormItem>
-          )} />
-        </div>
-        {signupMethod==='password' && (
-          <FormField control={form.control} name="password" render={({ field }) => (
-            <FormItem><FormLabel>Password</FormLabel><FormControl><Input {...field} type="password" placeholder="Minimo 8 caratteri" className="h-12" /></FormControl><FormMessage /></FormItem>
-          )} />
-        )}
-        <FormField control={form.control} name="birthdate" render={({ field }) => (
-          <FormItem><FormLabel>Data di nascita</FormLabel><FormControl><Input {...field} type="date" className="h-12" /></FormControl><FormMessage /></FormItem>
+        <FormField control={form.control} name="email" render={({ field }) => (
+          <FormItem className="space-y-1.5"><FormLabel className={fieldLabel}>Email</FormLabel><FormControl><Input {...field} type="email" placeholder="email@esempio.com" className={fieldInput} /></FormControl><FormMessage /></FormItem>
         )} />
-        <div className="space-y-2 text-sm border rounded-md p-3 bg-gray-50">
+        <FormField control={form.control} name="phone" render={({ field }) => (
+          <FormItem className="space-y-1.5"><FormLabel className={fieldLabel}>Telefono <small className="text-[11px] font-medium normal-case tracking-normal">(opzionale)</small></FormLabel><FormControl><Input {...field} type="tel" placeholder="+39 1234567890" className={fieldInput} /></FormControl><FormMessage /></FormItem>
+        )} />
+        <div className="grid grid-cols-2 gap-[10px]">
+          {signupMethod==='password' && (
+            <FormField control={form.control} name="password" render={({ field }) => (
+              <FormItem className="space-y-1.5"><FormLabel className={fieldLabel}>Password</FormLabel><FormControl><Input {...field} type="password" placeholder="Minimo 8 caratteri" className={fieldInput} /></FormControl><FormMessage /></FormItem>
+            )} />
+          )}
+          <FormField control={form.control} name="birthdate" render={({ field }) => (
+            <FormItem className="space-y-1.5"><FormLabel className={fieldLabel}>Data di nascita</FormLabel><FormControl><Input {...field} type="date" className={fieldInput} /></FormControl><FormMessage /></FormItem>
+          )} />
+        </div>
+        <div className="space-y-2 text-[11.5px] leading-[1.35] text-[#6b665d]">
           <div className="flex items-start gap-2">
-            <input type="checkbox" id="acceptedTermsAndConditions" className="mt-1 h-4 w-4" {...form.register('acceptedTermsAndConditions', { required: true })} />
-            <label htmlFor="acceptedTermsAndConditions" className="leading-snug">Accetto i <a href="/terms" target="_blank" className="text-brand-blue underline">Termini e Condizioni</a></label>
+            <input type="checkbox" id="acceptedTermsAndConditions" className="mt-px h-4 w-4 shrink-0 accent-[hsl(var(--brand-blue))]" {...form.register('acceptedTermsAndConditions', { required: true })} />
+            <label htmlFor="acceptedTermsAndConditions">Accetto i <a href="/terms" target="_blank" className="text-[hsl(var(--brand-dark))] underline decoration-[hsl(var(--brand-dark)/0.5)]">Termini e Condizioni</a></label>
           </div>
           {!form.watch('acceptedTermsAndConditions') && form.formState.isSubmitted && (<p className="text-red-500 text-xs">Devi accettare i Termini e Condizioni</p>)}
           <div className="flex items-start gap-2">
-            <input type="checkbox" id="acceptedPrivacyPolicy" className="mt-1 h-4 w-4" {...form.register('acceptedPrivacyPolicy', { required: true })} />
-            <label htmlFor="acceptedPrivacyPolicy" className="leading-snug">Accetto l' <a href="/privacy" target="_blank" className="text-brand-blue underline">Informativa Privacy</a></label>
+            <input type="checkbox" id="acceptedPrivacyPolicy" className="mt-px h-4 w-4 shrink-0 accent-[hsl(var(--brand-blue))]" {...form.register('acceptedPrivacyPolicy', { required: true })} />
+            <label htmlFor="acceptedPrivacyPolicy">Accetto l' <a href="/privacy" target="_blank" className="text-[hsl(var(--brand-dark))] underline decoration-[hsl(var(--brand-dark)/0.5)]">Informativa Privacy</a></label>
           </div>
           {!form.watch('acceptedPrivacyPolicy') && form.formState.isSubmitted && (<p className="text-red-500 text-xs">Devi accettare l'Informativa Privacy</p>)}
         </div>
@@ -79,10 +83,10 @@ export function RegisterForm({ form, onSubmit, signupMethod, loading, googleErro
           {isPassword ? (
             <Button
               type="submit"
-              className="flex-1 h-12 bg-brand-blue hover:bg-brand-dark"
+              className={ctaButton}
               disabled={loading || !acceptedTerms || !acceptedPrivacy}
             >
-              {loading ? (<><Loader2 className="w-4 h-4 mr-2 animate-spin" />Registrazione...</>) : 'Registrati'}
+              {loading ? (<><Loader2 className="w-4 h-4 mr-2 animate-spin" />Registrazione...</>) : 'Crea la mia carta'}
             </Button>
           ) : (
             // In Google mode, rely on the official Google button below
