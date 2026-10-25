@@ -64,7 +64,7 @@ export function RegisterForm({ form, onSubmit, signupMethod, loading, googleErro
             )} />
           )}
           <FormField control={form.control} name="birthdate" render={({ field }) => (
-            <FormItem className="space-y-1.5"><FormLabel className={fieldLabel}>Data di nascita</FormLabel><FormControl><Input {...field} type="date" className={fieldInput} /></FormControl><FormMessage /></FormItem>
+            <FormItem className="space-y-1.5"><FormLabel className={fieldLabel}>Data di nascita</FormLabel><FormControl><Input {...field} type="date" className={`${fieldInput} min-w-0 appearance-none [&::-webkit-date-and-time-value]:text-left`} /></FormControl><FormMessage /></FormItem>
           )} />
         </div>
         <div className="space-y-2 text-[11.5px] leading-[1.35] text-[#6b665d]">
