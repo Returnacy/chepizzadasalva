@@ -191,10 +191,10 @@ export default function AuthPage() {
   const isRegister = activeTab === 'register';
 
   return (
-    <div className="min-h-screen flex flex-col lg:grid lg:grid-cols-2">
+    <div className="min-h-screen supports-[height:100dvh]:min-h-dvh flex flex-col lg:grid lg:grid-cols-2">
       {/* Hero: the brand's own loyalty card on its dark colour */}
       <div
-        className={`auth-hero relative flex-none overflow-hidden bg-[hsl(var(--brand-dark))] px-6 pb-[46px] text-center text-white lg:flex lg:min-h-screen lg:flex-col lg:items-center lg:justify-center lg:p-12 ${isRegister ? 'pt-8' : 'pt-12'}`}
+        className={`auth-hero relative flex flex-1 flex-col items-center justify-center overflow-hidden bg-[hsl(var(--brand-dark))] px-6 pb-[46px] text-center text-white lg:min-h-screen lg:p-12 ${isRegister ? 'pt-8' : 'pt-12'}`}
       >
         <div
           aria-hidden
@@ -213,8 +213,8 @@ export default function AuthPage() {
       </div>
 
       {/* Form sheet */}
-      <div className="flex flex-1 flex-col lg:items-center lg:justify-center lg:bg-gradient-to-br lg:from-[var(--brand-surface-from)] lg:to-[var(--brand-surface-to)] lg:p-8">
-        <div className="relative -mt-[22px] flex flex-1 flex-col gap-[14px] rounded-t-[26px] bg-white p-[22px] text-[#1d1b18] lg:mt-0 lg:w-full lg:max-w-md lg:flex-none lg:rounded-[26px] lg:shadow-[0_12px_40px_-16px_rgba(0,0,0,0.18)]">
+      <div className="flex flex-none flex-col lg:items-center lg:justify-center lg:bg-gradient-to-br lg:from-[var(--brand-surface-from)] lg:to-[var(--brand-surface-to)] lg:p-8">
+        <div className="relative -mt-[22px] flex flex-none flex-col gap-[14px] rounded-t-[26px] bg-white px-[22px] pb-[max(22px,env(safe-area-inset-bottom))] pt-[22px] text-[#1d1b18] lg:mt-0 lg:w-full lg:max-w-md lg:rounded-[26px] lg:shadow-[0_12px_40px_-16px_rgba(0,0,0,0.18)]">
           <Tabs value={activeTab} onValueChange={(v: 'login' | 'register') => setActiveTab(v)} className="flex w-full flex-col gap-[14px]">
             <TabsList className="relative grid h-auto w-full grid-cols-2 rounded-[12px] bg-[#f6f4ef] p-1">
               <span
@@ -275,7 +275,7 @@ export default function AuthPage() {
             </TabsContent>
           </Tabs>
 
-          <p className="mt-auto pt-1.5 text-center text-[11px] tracking-[0.02em] text-[#a39d92]">
+          <p className="pt-4 text-center lg:pt-1.5 text-[11px] tracking-[0.02em] text-[#a39d92]">
             Fidelity by <b className="font-semibold text-[#8a8478]">Returnacy</b>
           </p>
         </div>
