@@ -640,6 +640,15 @@ Due note sull'import:
 - **`VITE_GOOGLE_CLIENT_ID` non si mette qui**: è nel `.env.local` committato del
   repo e vale per tutti i brand. Da sola non accende niente — §13.
 
+**Preview e Production hanno variabili separate.** Il progetto Pages builda come
+preview ogni branch di questo repo (`<branch>.<progetto>.pages.dev`), con le
+variabili dell'ambiente **Preview**, non di Production: vanno importate anche lì,
+dallo stesso `pages.env`, oppure vanno disattivati i preview deployment
+(Settings → Builds → Branch control → Preview branches: None). Su sudest e quieora
+il Preview era vuoto e le preview sono uscite con l'identità di Che Pizza; ora
+`check-brand.mjs` riconosce il progetto da `CF_PAGES_URL` e fuori da
+`che-pizza-da-salva` fa fallire il build.
+
 Il colore è **un solo token**, non un tema. `VITE_BRAND_PRIMARY` sostituisce il
 blu Che Pizza (bottoni, icone, bordi, gradiente della carta fedeltà);
 `VITE_BRAND_PRIMARY_DARK` è la tinta scura di hover/tab attivo e, se non dichiarata,
