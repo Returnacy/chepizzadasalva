@@ -75,7 +75,7 @@ export function RegisterForm({ form, onSubmit, signupMethod, loading, googleErro
           {!form.watch('acceptedTermsAndConditions') && form.formState.isSubmitted && (<p className="text-red-500 text-xs">Devi accettare i Termini e Condizioni</p>)}
           <div className="flex items-start gap-2">
             <input type="checkbox" id="acceptedPrivacyPolicy" className="mt-px h-4 w-4 shrink-0 accent-[hsl(var(--brand-blue))]" {...form.register('acceptedPrivacyPolicy', { required: true })} />
-            <label htmlFor="acceptedPrivacyPolicy">Accetto l' <a href="/privacy" target="_blank" className="text-[hsl(var(--brand-dark))] underline decoration-[hsl(var(--brand-dark)/0.5)]">Informativa Privacy</a></label>
+            <label htmlFor="acceptedPrivacyPolicy">Accetto l'<a href="/privacy" target="_blank" className="text-[hsl(var(--brand-dark))] underline decoration-[hsl(var(--brand-dark)/0.5)]">Informativa Privacy</a></label>
           </div>
           {!form.watch('acceptedPrivacyPolicy') && form.formState.isSubmitted && (<p className="text-red-500 text-xs">Devi accettare l'Informativa Privacy</p>)}
         </div>
