@@ -41,6 +41,16 @@
  *     VITE_BRAND_NAME with any other brand variable set is now an error, not
  *     a Che Pizza build.
  *
+ *  6. A client's Pages PREVIEW build carrying no brand variables at all. Each
+ *     Pages project builds every branch of this repo as a preview, and the
+ *     Preview environment has its own variables, separate from Production: on
+ *     returnacy-sudest and returnacy-quieora it was empty, so the build read as
+ *     Che Pizza's (nothing set → nothing to check, see 5) and the client's
+ *     preview URLs went out with Che Pizza's name, logo, brandId and legal
+ *     pages. So on Cloudflare Pages the project decides, not the env: outside
+ *     Che Pizza's own project (che-pizza-da-salva) nothing may default to Che
+ *     Pizza, and Che Pizza's project may not carry another brand's name.
+ *
  * Runs as `prebuild`, so `pnpm build` cannot skip it. Cloudflare Pages passes
  * its project env into the build, so the same check runs there.
  */
@@ -82,6 +92,7 @@ const REQUIRED_FOR_NEW_BRAND = [
   // blue: both fall back silently, neither is visible in a diff of the env.
   'VITE_BRAND_LOGO_URL',
   'VITE_BRAND_PRIMARY',
+  'VITE_BRAND_ID',
   'VITE_BUSINESS_ID',
   'VITE_USER_SERVICE_URL',
   'VITE_BUSINESS_SERVICE_URL',
@@ -145,19 +156,64 @@ if (brandName === '' && partialBrandKeys.length > 0) {
   );
 }
 
-// 5. If this is not Che Pizza's build, nothing may fall back to Che Pizza's.
-const isChePizza = brandName === '' || brandName === CHE_PIZZA_DEFAULTS.VITE_BRAND_NAME;
+// 5. On Cloudflare Pages, the project is whose build this is (failure mode 6).
+// CF_PAGES_URL is <project>.pages.dev or <branch|hash>.<project>.pages.dev.
+const CHE_PIZZA_PAGES_PROJECT = 'che-pizza-da-salva';
+const onPages = (env.CF_PAGES ?? '').trim() !== '';
+let pagesProject = null;
+if (onPages) {
+  const pagesUrl = (env.CF_PAGES_URL ?? '').trim();
+  let host = '';
+  try {
+    host = new URL(pagesUrl).hostname.toLowerCase();
+  } catch {}
+  const m = host.match(/^(?:([a-z0-9-]+)\.)?([a-z0-9-]+)\.pages\.dev$/);
+  if (!m) {
+    errors.push(
+      `CF_PAGES is set but CF_PAGES_URL ("${pagesUrl}") is not a *.pages.dev URL: ` +
+        'cannot tell which Pages project this build is for, so it is not taken to be Che Pizza\'s.',
+    );
+  } else {
+    pagesProject = m[2];
+    const branch = (env.CF_PAGES_BRANCH ?? '').trim() || '(unknown)';
+    // A bare <project>.pages.dev is Production; a branch alias is a Preview; an
+    // 8-hex prefix is a per-deployment hash, which either environment can get.
+    const deployment = !m[1] ? 'Production' : /^[0-9a-f]{8}$/.test(m[1]) ? 'Preview or Production' : 'Preview';
+    if (pagesProject !== CHE_PIZZA_PAGES_PROJECT && brandName === '') {
+      errors.push(
+        `Cloudflare Pages project "${pagesProject}" (branch "${branch}", ${deployment} deployment) is not ` +
+          `Che Pizza's (${CHE_PIZZA_PAGES_PROJECT}), but VITE_BRAND_NAME is empty: this build would publish ` +
+          "Che Pizza's name, logo, brandId and legal pages. " +
+          `Import PizzeriaOS/clients/<slug>/pages.env into this project's ${deployment} environment ` +
+          '(Settings → Variables and Secrets) — Preview and Production have separate variables — ' +
+          'or turn preview deployments off (Settings → Builds → Branch control → Preview branches: None).',
+      );
+    }
+    if (pagesProject === CHE_PIZZA_PAGES_PROJECT && brandName !== '' && brandName !== CHE_PIZZA_DEFAULTS.VITE_BRAND_NAME) {
+      errors.push(
+        `Cloudflare Pages project "${pagesProject}" is Che Pizza's, but VITE_BRAND_NAME is "${brandName}": ` +
+          "a client's configuration has been set on Che Pizza's project.",
+      );
+    }
+  }
+}
+
+// 6. If this is not Che Pizza's build, nothing may fall back to Che Pizza's.
+const isChePizza =
+  (!onPages || pagesProject === CHE_PIZZA_PAGES_PROJECT) &&
+  (brandName === '' || brandName === CHE_PIZZA_DEFAULTS.VITE_BRAND_NAME);
+const brandLabel = brandName || `(unnamed, Pages project ${pagesProject ?? 'unknown'})`;
 
 if (!isChePizza) {
   for (const key of REQUIRED_FOR_NEW_BRAND) {
     const value = (env[key] ?? '').trim();
     if (value === '') {
-      errors.push(`${key} is required for brand "${brandName}" (would fall back to Che Pizza's value)`);
+      errors.push(`${key} is required for brand "${brandLabel}" (would fall back to Che Pizza's value)`);
       continue;
     }
     const inherited = CHE_PIZZA_DEFAULTS[key];
     if (inherited && value.toLowerCase() === inherited.toLowerCase()) {
-      errors.push(`${key} is still Che Pizza's value ("${value}") while building brand "${brandName}"`);
+      errors.push(`${key} is still Che Pizza's value ("${value}") while building brand "${brandLabel}"`);
     }
   }
 
@@ -166,7 +222,7 @@ if (!isChePizza) {
     const haystack = value.toLowerCase();
     for (const [marker, what] of CHE_PIZZA_MARKERS) {
       if (haystack.includes(marker)) {
-        errors.push(`${key} still carries ${what} ("${value}") while building brand "${brandName}"`);
+        errors.push(`${key} still carries ${what} ("${value}") while building brand "${brandLabel}"`);
       }
     }
   }
