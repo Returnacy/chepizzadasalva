@@ -3,14 +3,14 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useMutation } from "@tanstack/react-query";
 import { Link, useSearch } from "wouter";
-import { Lock, CheckCircle, AlertTriangle, Eye, EyeOff } from "lucide-react";
+import { Eye, EyeOff, Loader2 } from "lucide-react";
 import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../components/ui/card";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "../components/ui/form";
 import { useToast } from "../hooks/use-toast";
 import { z } from "zod";
 import { http } from "../lib/http";
+import { AuthShell, AuthSheetHeading, authCta, authInput, authLabel, authLink } from "../features/auth/components/AuthShell";
 
 // Local schema replacing removed shared schema
 const confirmPasswordSchema = z.object({
@@ -78,218 +78,169 @@ export default function ResetPasswordPage() {
   // Show error if no token provided
   if (!token) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-[var(--brand-surface-from)] to-[var(--brand-surface-to)] p-4">
-        <Card className="w-full max-w-md">
-          <CardHeader className="text-center">
-            <div className="mx-auto w-12 h-12 bg-red-100 rounded-full flex items-center justify-center mb-4">
-              <AlertTriangle className="w-6 h-6 text-red-600" />
-            </div>
-            <CardTitle className="text-xl text-gray-900">Link Non Valido</CardTitle>
-            <CardDescription className="text-sm text-gray-600">
-              Il link per il reset della password non è valido o mancante.
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <Button asChild className="w-full">
-              <Link href="/auth/forgot-password">
-                Richiedi Nuovo Link
-              </Link>
-            </Button>
-          </CardContent>
-        </Card>
-      </div>
+      <AuthShell>
+        <AuthSheetHeading title="Link non valido">
+          Il link per il reset della password non è valido o mancante.
+        </AuthSheetHeading>
+        <Button asChild className={authCta}>
+          <Link href="/auth/forgot-password">
+            Richiedi nuovo link
+          </Link>
+        </Button>
+        <div className="text-center">
+          <Link href="/auth" className={authLink}>
+            Torna all'accesso
+          </Link>
+        </div>
+      </AuthShell>
     );
   }
 
   // Show loading while verifying token
   if (verifyingToken) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-[var(--brand-surface-from)] to-[var(--brand-surface-to)] p-4">
-        <Card className="w-full max-w-md">
-          <CardContent className="pt-6">
-            <div className="text-center">
-              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[var(--brand-accent)] mx-auto mb-4"></div>
-              <p className="text-sm text-gray-600">Verifica del link in corso...</p>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
+      <AuthShell>
+        <div className="flex flex-col items-center gap-3 py-2 text-center">
+          <Loader2 className="h-8 w-8 animate-spin text-[hsl(var(--brand-blue))]" />
+          <p className="text-[13px] text-[#6b665d]">Verifica del link in corso...</p>
+        </div>
+      </AuthShell>
     );
   }
 
   // Show error if token is invalid or expired
   if (tokenError || !tokenVerification?.valid) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-[var(--brand-surface-from)] to-[var(--brand-surface-to)] p-4">
-        <Card className="w-full max-w-md">
-          <CardHeader className="text-center">
-            <div className="mx-auto w-12 h-12 bg-red-100 rounded-full flex items-center justify-center mb-4">
-              <AlertTriangle className="w-6 h-6 text-red-600" />
-            </div>
-            <CardTitle className="text-xl text-gray-900">Link Scaduto</CardTitle>
-            <CardDescription className="text-sm text-gray-600">
-              Il link per il reset della password è scaduto o non valido.
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="bg-yellow-50 p-4 rounded-lg border border-yellow-200">
-              <p className="text-sm text-yellow-800">
-                I link per il reset della password scadono dopo 30 minuti per motivi di sicurezza.
-              </p>
-            </div>
-            <Button asChild className="w-full">
-              <Link href="/auth/forgot-password">
-                Richiedi Nuovo Link
-              </Link>
-            </Button>
-          </CardContent>
-        </Card>
-      </div>
+      <AuthShell>
+        <AuthSheetHeading title="Link scaduto">
+          Il link per il reset della password è scaduto o non valido. I link scadono dopo 30 minuti per motivi di sicurezza.
+        </AuthSheetHeading>
+        <Button asChild className={authCta}>
+          <Link href="/auth/forgot-password">
+            Richiedi nuovo link
+          </Link>
+        </Button>
+        <div className="text-center">
+          <Link href="/auth" className={authLink}>
+            Torna all'accesso
+          </Link>
+        </div>
+      </AuthShell>
     );
   }
 
   // Show success message
   if (isSuccess) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-[var(--brand-surface-from)] to-[var(--brand-surface-to)] p-4">
-        <Card className="w-full max-w-md">
-          <CardHeader className="text-center">
-            <div className="mx-auto w-12 h-12 bg-green-100 rounded-full flex items-center justify-center mb-4">
-              <CheckCircle className="w-6 h-6 text-green-600" />
-            </div>
-            <CardTitle className="text-xl text-gray-900">Password Aggiornata!</CardTitle>
-            <CardDescription className="text-sm text-gray-600">
-              La tua password è stata aggiornata con successo.
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="bg-green-50 p-4 rounded-lg border border-green-200">
-              <p className="text-sm text-green-800">
-                Ora puoi utilizzare la nuova password per accedere al tuo account.
-              </p>
-            </div>
-            <Button asChild className="w-full">
-              <Link href="/auth">
-                Vai al Login
-              </Link>
-            </Button>
-          </CardContent>
-        </Card>
-      </div>
+      <AuthShell>
+        <AuthSheetHeading title="Password aggiornata">
+          La tua password è stata aggiornata. Ora puoi usarla per accedere al tuo account.
+        </AuthSheetHeading>
+        <Button asChild className={authCta}>
+          <Link href="/auth">
+            Vai all'accesso
+          </Link>
+        </Button>
+      </AuthShell>
     );
   }
 
   // Show password reset form
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-[var(--brand-surface-from)] to-[var(--brand-surface-to)] p-4">
-      <Card className="w-full max-w-md">
-        <CardHeader className="text-center">
-          <div className="mx-auto w-12 h-12 bg-[var(--brand-tint)] rounded-full flex items-center justify-center mb-4">
-            <Lock className="w-6 h-6 text-[var(--brand-accent)]" />
-          </div>
-          <CardTitle className="text-xl text-gray-900">Reimposta Password</CardTitle>
-          <CardDescription className="text-sm text-gray-600">
-            Inserisci la tua nuova password qui sotto.
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <Form {...form}>
-            <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
-              <FormField
-                control={form.control}
-                name="password"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Nuova Password</FormLabel>
-                    <FormControl>
-                      <div className="relative">
-                        <Input
-                          {...field}
-                          type={showPassword ? "text" : "password"}
-                          placeholder="Inserisci la nuova password"
-                          disabled={resetPasswordMutation.isPending}
-                        />
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          size="sm"
-                          className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent"
-                          onClick={() => setShowPassword(!showPassword)}
-                          disabled={resetPasswordMutation.isPending}
-                        >
-                          {showPassword ? (
-                            <EyeOff className="h-4 w-4 text-gray-400" />
-                          ) : (
-                            <Eye className="h-4 w-4 text-gray-400" />
-                          )}
-                        </Button>
-                      </div>
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
+    <AuthShell>
+      <AuthSheetHeading title="Reimposta la password">
+        Scegli una nuova password: da 8 a 20 caratteri.
+      </AuthSheetHeading>
+      <Form {...form}>
+        <form onSubmit={form.handleSubmit(onSubmit)} className="flex flex-col gap-[14px]">
+          <FormField
+            control={form.control}
+            name="password"
+            render={({ field }) => (
+              <FormItem className="space-y-1.5">
+                <FormLabel className={authLabel}>Nuova password</FormLabel>
+                <FormControl>
+                  <div className="relative">
+                    <Input
+                      {...field}
+                      type={showPassword ? "text" : "password"}
+                      placeholder="La nuova password"
+                      className={`${authInput} pr-11`}
+                      disabled={resetPasswordMutation.isPending}
+                    />
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      aria-label={showPassword ? "Nascondi password" : "Mostra password"}
+                      className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent"
+                      onClick={() => setShowPassword(!showPassword)}
+                      disabled={resetPasswordMutation.isPending}
+                    >
+                      {showPassword ? (
+                        <EyeOff className="h-4 w-4 text-[#9a948a]" />
+                      ) : (
+                        <Eye className="h-4 w-4 text-[#9a948a]" />
+                      )}
+                    </Button>
+                  </div>
+                </FormControl>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
 
-              <FormField
-                control={form.control}
-                name="confirmPassword"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Conferma Password</FormLabel>
-                    <FormControl>
-                      <div className="relative">
-                        <Input
-                          {...field}
-                          type={showConfirmPassword ? "text" : "password"}
-                          placeholder="Conferma la nuova password"
-                          disabled={resetPasswordMutation.isPending}
-                        />
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          size="sm"
-                          className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent"
-                          onClick={() => setShowConfirmPassword(!showConfirmPassword)}
-                          disabled={resetPasswordMutation.isPending}
-                        >
-                          {showConfirmPassword ? (
-                            <EyeOff className="h-4 w-4 text-gray-400" />
-                          ) : (
-                            <Eye className="h-4 w-4 text-gray-400" />
-                          )}
-                        </Button>
-                      </div>
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
+          <FormField
+            control={form.control}
+            name="confirmPassword"
+            render={({ field }) => (
+              <FormItem className="space-y-1.5">
+                <FormLabel className={authLabel}>Conferma password</FormLabel>
+                <FormControl>
+                  <div className="relative">
+                    <Input
+                      {...field}
+                      type={showConfirmPassword ? "text" : "password"}
+                      placeholder="Ripeti la nuova password"
+                      className={`${authInput} pr-11`}
+                      disabled={resetPasswordMutation.isPending}
+                    />
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      aria-label={showConfirmPassword ? "Nascondi password" : "Mostra password"}
+                      className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent"
+                      onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                      disabled={resetPasswordMutation.isPending}
+                    >
+                      {showConfirmPassword ? (
+                        <EyeOff className="h-4 w-4 text-[#9a948a]" />
+                      ) : (
+                        <Eye className="h-4 w-4 text-[#9a948a]" />
+                      )}
+                    </Button>
+                  </div>
+                </FormControl>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
 
-              <div className="bg-[var(--brand-surface-from)] p-3 rounded-lg border border-[var(--brand-tint-border)]">
-                <p className="text-xs text-[var(--brand-ink)]">
-                  La password deve essere di almeno 8 caratteri e massimo 20.
-                </p>
-              </div>
-
-              <Button
-                type="submit"
-                className="w-full"
-                disabled={resetPasswordMutation.isPending}
-              >
-                {resetPasswordMutation.isPending ? "Aggiornamento..." : "Aggiorna Password"}
-              </Button>
-            </form>
-          </Form>
-
-          <div className="mt-6 text-center">
-            <Link href="/auth">
-              <Button variant="ghost" className="text-sm">
-                Torna al Login
-              </Button>
-            </Link>
-          </div>
-        </CardContent>
-      </Card>
-    </div>
+          <Button
+            type="submit"
+            className={authCta}
+            disabled={resetPasswordMutation.isPending}
+          >
+            {resetPasswordMutation.isPending ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Aggiornamento...</> : "Aggiorna password"}
+          </Button>
+        </form>
+      </Form>
+      <div className="text-center">
+        <Link href="/auth" className={authLink}>
+          Torna all'accesso
+        </Link>
+      </div>
+    </AuthShell>
   );
 }

@@ -4,8 +4,8 @@ import { http } from "../lib/http";
 import { z } from "zod";
 import { emailVerificationsSchema, type EmailVerificationsInput } from "../schema/email-verifications.schema";
 import { Button } from "../components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../components/ui/card";
-import { CheckCircle, AlertCircle, Loader2 } from "lucide-react";
+import { Loader2 } from "lucide-react";
+import { AuthShell, AuthSheetHeading, authCta, authSecondary } from "../features/auth/components/AuthShell";
 
 export default function VerifyEmailPage() {
   const search = useSearch();
@@ -53,46 +53,31 @@ export default function VerifyEmailPage() {
   }, [status, navigate]);
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-[var(--brand-surface-from)] to-[var(--brand-surface-to)] p-4">
-      <Card className="w-full max-w-md">
-        <CardHeader className="text-center">
-          {status === "success" ? (
-            <div className="mx-auto w-12 h-12 bg-green-100 rounded-full flex items-center justify-center mb-4">
-              <CheckCircle className="w-6 h-6 text-green-600" />
-            </div>
-          ) : status === "error" ? (
-            <div className="mx-auto w-12 h-12 bg-red-100 rounded-full flex items-center justify-center mb-4">
-              <AlertCircle className="w-6 h-6 text-red-600" />
-            </div>
-          ) : (
-            <div className="mx-auto w-12 h-12 bg-[var(--brand-tint)] rounded-full flex items-center justify-center mb-4">
-              <Loader2 className="w-6 h-6 text-[var(--brand-accent)] animate-spin" />
-            </div>
-          )}
-          <CardTitle className="text-xl text-gray-900">
-            {status === "success" ? "Email verificata" : status === "error" ? "Verifica fallita" : "Verifica email in corso"}
-          </CardTitle>
-          <CardDescription className="text-sm text-gray-600">
-            {status === "success"
-              ? "La tua email è stata verificata con successo. Verrai reindirizzato alla home in pochi secondi."
-              : status === "error"
-                ? errorMsg || "Si è verificato un errore nella verifica dell'email."
-                : "Attendere mentre verifichiamo il tuo indirizzo email..."}
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4 text-center">
-          {status === "success" && (
-            <Button asChild className="w-full">
-              <a href="/auth">Vai al Login</a>
-            </Button>
-          )}
-          {status === "error" && (
-            <Button asChild variant="outline" className="w-full">
-              <a href="/auth">Torna al Login</a>
-            </Button>
-          )}
-        </CardContent>
-      </Card>
-    </div>
+    <AuthShell>
+      <AuthSheetHeading
+        title={status === "success" ? "Email verificata" : status === "error" ? "Verifica fallita" : "Verifica email in corso"}
+      >
+        {status === "success"
+          ? "La tua email è stata verificata con successo. Verrai reindirizzato alla home in pochi secondi."
+          : status === "error"
+            ? errorMsg || "Si è verificato un errore nella verifica dell'email."
+            : "Attendere mentre verifichiamo il tuo indirizzo email..."}
+      </AuthSheetHeading>
+      {(status === "idle" || status === "submitting") && (
+        <div className="flex justify-center py-1">
+          <Loader2 className="h-7 w-7 animate-spin text-[hsl(var(--brand-blue))]" />
+        </div>
+      )}
+      {status === "success" && (
+        <Button asChild className={authCta}>
+          <a href="/auth">Vai all'accesso</a>
+        </Button>
+      )}
+      {status === "error" && (
+        <Button asChild className={authSecondary}>
+          <a href="/auth">Torna all'accesso</a>
+        </Button>
+      )}
+    </AuthShell>
   );
 }
