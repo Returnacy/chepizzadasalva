@@ -25,38 +25,39 @@ function roleRank(role: Role): number {
   return idx >= 0 ? idx : 0; // unknown roles treated as lowest
 }
 
-export function getRolesForContext(user: ClientType | null | undefined, ctx?: TenantContext): Role[] {
-  if (!user || !Array.isArray((user as any).memberships)) return [];
-  const { businessId, brandId } = ctx || getTenantContext();
-  const bid = normalize(businessId || null);
-  const brd = normalize(brandId || null);
+// A membership belongs to the current tenant when it names this build's brand or
+// this build's business (the staff's chosen location, else the build default).
+// Same rule as business-service's membershipInTenant: older rows carry only a
+// businessId, newer ones a brandId too. An empty context matches nothing.
+function membershipInTenant(m: any, ctx: TenantContext): boolean {
+  const bid = normalize(ctx.businessId || null);
+  const brd = normalize(ctx.brandId || null);
+  if (bid && normalize(m?.businessId) === bid) return true;
+  if (brd && normalize(m?.brandId) === brd) return true;
+  return false;
+}
 
+function tenantMemberships(user: ClientType | null | undefined, ctx?: TenantContext): any[] {
+  if (!user || !Array.isArray((user as any).memberships)) return [];
+  const c = ctx || getTenantContext();
+  return ((user as any).memberships as any[]).filter((m) => membershipInTenant(m, c));
+}
+
+/** True when the user holds a membership (any role) in the current tenant. */
+export function isTenantMember(user: ClientType | null | undefined, ctx?: TenantContext): boolean {
+  return tenantMemberships(user, ctx).length > 0;
+}
+
+// Roles come only from memberships in the current tenant. There is deliberately
+// no fallback (top-level user.role, or every membership the account holds):
+// either one let a brand's staff into another brand's staff UI.
+export function getRolesForContext(user: ClientType | null | undefined, ctx?: TenantContext): Role[] {
   const roles: Role[] = [];
-  for (const m of (user as any).memberships as any[]) {
-    const mBid = normalize(m.businessId);
-    const mBrd = normalize(m.brandId);
-    const matchesBusiness = !!bid && mBid === bid;
-    const matchesBrandOnly = !bid && !!brd && mBrd === brd;
-    if (matchesBusiness || matchesBrandOnly) {
-      if (m.role) roles.push((m.role as string).toLowerCase());
-      if (Array.isArray(m.roles)) roles.push(...m.roles.map((r: string) => r.toLowerCase()));
-    }
+  for (const m of tenantMemberships(user, ctx)) {
+    if (m.role) roles.push((m.role as string).toLowerCase());
+    if (Array.isArray(m.roles)) roles.push(...m.roles.map((r: string) => r.toLowerCase()));
   }
-  const unique = Array.from(new Set(roles));
-  // Fallback: if no contextual roles found, use top-level user.role if present
-  if (unique.length === 0) {
-    if ((user as any)?.role) {
-      return [normalize((user as any).role) as Role];
-    }
-    // Dev-friendly fallback: if tenant filter yields no roles, aggregate across all memberships
-    const all: string[] = [];
-    for (const m of (user as any).memberships || []) {
-      if (m.role) all.push(String(m.role).toLowerCase());
-      if (Array.isArray(m.roles)) all.push(...m.roles.map((r: string) => r.toLowerCase()));
-    }
-    if (all.length) return Array.from(new Set(all)) as Role[];
-  }
-  return unique;
+  return Array.from(new Set(roles));
 }
 
 export function getHighestRole(user: ClientType | null | undefined, ctx?: TenantContext): Role | null {
