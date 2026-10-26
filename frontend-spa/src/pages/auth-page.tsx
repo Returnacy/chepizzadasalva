@@ -4,16 +4,18 @@ import { type LoginInput } from '../schema/login/login.schema';
 import { type SignupInput } from '../schema/signup/signup.schema';
 import { useAuth } from '../hooks/use-auth';
 // Google signup now uses official GIS button; login flow remains unchanged for now
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../components/ui/tabs';
-import { Pizza, Users, Star, TrendingUp } from 'lucide-react';
 import { useLoginForm, useRegisterForm, useAuthMethodToggle, RegistrationFormValues } from '../features/auth/hooks/useAuthForms';
 import { LoginForm } from '../features/auth/components/LoginForm';
 import { RegisterForm } from '../features/auth/components/RegisterForm';
 import { useToast } from '../hooks/use-toast';
 import { tokenService } from '../lib/token-service';
 import { BRAND } from '../config/brand';
-import { getGoogleClientId, isChePizzaBuild, isGoogleLoginEnabled } from '../lib/brand-flags';
+import { getGoogleClientId, isGoogleLoginEnabled } from '../lib/brand-flags';
+import loyaltyLogo from '@assets/che_pizza_fidelity_logo_horizontal.png';
+
+// Segmented-control trigger: transparent, so the sliding white pill behind it shows.
+const segTrigger = 'relative z-10 rounded-[9px] py-[9px] text-sm font-semibold text-[#6b665d] transition-none data-[state=active]:bg-transparent data-[state=active]:text-[#1d1b18] data-[state=active]:shadow-none auth-seg-tab';
 
 export default function AuthPage() {
   const [, setLocation] = useLocation();
@@ -186,139 +188,96 @@ export default function AuthPage() {
     }
   };
 
+  const isRegister = activeTab === 'register';
+
   return (
-    <div className="min-h-screen bg-gradient-to-br from-[var(--brand-surface-from)] to-[var(--brand-surface-to)] flex items-center justify-center p-2 sm:p-4">
-      <div className="w-full max-w-6xl grid grid-cols-1 lg:grid-cols-2 gap-4 lg:gap-8 items-center">
-        {/* Hero Section - Hidden on mobile, visible on desktop */}
-        <div className="hidden lg:block space-y-8 text-left">
-          <div className="space-y-4">
-            <div className="flex items-center space-x-2">
-              <Pizza className="h-8 w-8 text-brand-blue" />
-              <h1 className="text-3xl font-bold text-gray-900">
-                {BRAND.fullName}
-              </h1>
-            </div>
-            <h2 className="text-5xl font-bold text-gray-900 leading-tight">
-              Il tuo sistema di
-              <span className="text-brand-blue"> fedeltà digitale</span>
-            </h2>
-            <p className="text-xl text-gray-600 max-w-2xl">
-              Accumula punti ad ogni visita, ricevi coupon gratuiti e aiutaci a
-              migliorare il nostro servizio con il tuo feedback.
-            </p>
-          </div>
+    <div className="min-h-screen supports-[height:100dvh]:min-h-dvh flex flex-col lg:grid lg:grid-cols-2">
+      {/* Hero: the brand's own loyalty card on its dark colour */}
+      <div
+        className={`auth-hero relative flex flex-1 flex-col items-center justify-center overflow-hidden bg-[hsl(var(--brand-dark))] px-6 pb-[46px] text-center text-white lg:min-h-screen lg:p-12 ${isRegister ? 'pt-8' : 'pt-12'}`}
+      >
+        <div
+          aria-hidden
+          className="pointer-events-none absolute -left-[20%] -right-[20%] -top-[40%] h-[120%] lg:inset-0 lg:h-full"
+          style={{ background: 'radial-gradient(60% 60% at 50% 35%, hsl(var(--brand-blue) / 0.55) 0%, transparent 70%)' }}
+        />
+        <img
+          src={BRAND.logoUrl || loyaltyLogo}
+          alt={`Carta fedeltà ${BRAND.fullName}`}
+          className={`auth-card relative mx-auto block -rotate-[4deg] rounded-[14px] shadow-[0_24px_40px_-14px_rgba(0,0,0,0.6)] lg:mb-8 lg:w-[70%] lg:max-w-[340px] ${isRegister ? 'mb-3 w-[46%] max-w-[170px]' : 'mb-[18px] w-[70%] max-w-[250px]'}`}
+        />
+        <h1 className="relative mb-1 text-[22px] font-bold tracking-[-0.01em] [text-wrap:balance] lg:text-[30px]">
+          {BRAND.fullName}
+        </h1>
+        <p className="relative text-sm text-white/[0.72] lg:text-base">La tua carta fedeltà</p>
+      </div>
 
-          <div className="grid grid-cols-3 gap-6">
-            <div className="bg-white p-6 rounded-2xl shadow-lg">
-              <Users className="h-8 w-8 text-green-500 mb-3" />
-              <h3 className="font-semibold text-gray-900 mb-2">
-                Facile da usare
-              </h3>
-              <p className="text-sm text-gray-600">
-                Registrati con email o telefono
-              </p>
-            </div>
+      {/* Form sheet */}
+      <div className="flex flex-none flex-col lg:items-center lg:justify-center lg:bg-gradient-to-br lg:from-[var(--brand-surface-from)] lg:to-[var(--brand-surface-to)] lg:p-8">
+        <div className="relative -mt-[22px] flex flex-none flex-col gap-[14px] rounded-t-[26px] bg-white px-[22px] pb-[max(22px,env(safe-area-inset-bottom))] pt-[22px] text-[#1d1b18] lg:mt-0 lg:w-full lg:max-w-md lg:rounded-[26px] lg:shadow-[0_12px_40px_-16px_rgba(0,0,0,0.18)]">
+          <Tabs value={activeTab} onValueChange={(v: 'login' | 'register') => setActiveTab(v)} className="flex w-full flex-col gap-[14px]">
+            <TabsList className="relative grid h-auto w-full grid-cols-2 rounded-[12px] bg-[#f6f4ef] p-1">
+              <span
+                aria-hidden
+                className="auth-seg-pill absolute left-1 top-1 h-[calc(100%-8px)] w-[calc(50%-4px)] rounded-[9px] bg-white shadow-[0_1px_3px_rgba(0,0,0,0.12)]"
+                style={{ transform: isRegister ? 'translateX(100%)' : 'translateX(0)' }}
+              />
+              <TabsTrigger value="login" className={segTrigger}>
+                Accedi
+              </TabsTrigger>
+              <TabsTrigger value="register" className={segTrigger}>
+                Registrati
+              </TabsTrigger>
+            </TabsList>
 
-            <div className="bg-white p-6 rounded-2xl shadow-lg">
-              <Star className="h-8 w-8 text-yellow-500 mb-3" />
-              <h3 className="font-semibold text-gray-900 mb-2">
-                Premi fedeltà
-              </h3>
-              <p className="text-sm text-gray-600">
-                {/* Che Pizza's own prize; other brands' rewards come from their Prize rows. */}
-                {isChePizzaBuild() ? '18 punti = pizza gratuita' : 'Raccogli timbri e ricevi premi'}
-              </p>
-            </div>
-
-            <div className="bg-white p-6 rounded-2xl shadow-lg">
-              <TrendingUp className="h-8 w-8 text-blue-500 mb-3" />
-              <h3 className="font-semibold text-gray-900 mb-2">
-                Il tuo feedback
-              </h3>
-              <p className="text-sm text-gray-600">
-                Aiutaci a migliorare sempre
-              </p>
-            </div>
-          </div>
-        </div>
-
-        {/* Authentication Forms */}
-        <div className="w-full max-w-sm mx-auto lg:max-w-md">
-          {/* Mobile Header */}
-          <div className="lg:hidden text-center mb-6">
-            <div className="flex items-center justify-center space-x-2 mb-2">
-              <Pizza className="h-6 w-6 text-brand-blue" />
-              <h1 className="text-xl font-bold text-gray-900">
-                {BRAND.fullName}
-              </h1>
-            </div>
-            <p className="text-sm text-gray-600">Sistema di fedeltà digitale</p>
-          </div>
-
-          <Card className="shadow-lg border-0">
-            <CardHeader className="space-y-1 pb-4">
-              <CardTitle className="text-xl lg:text-2xl font-bold text-center">
-                Benvenuto
-              </CardTitle>
-              <CardDescription className="text-center text-sm">
-                Accedi al tuo account o registrati per iniziare
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="p-4 sm:p-6">
-              <Tabs value={activeTab} onValueChange={(v: 'login' | 'register') => setActiveTab(v)} className="w-full">
-                <TabsList className="grid w-full grid-cols-2 relative bg-gray-100 p-1 rounded-lg h-9">
-                  <TabsTrigger
-                    value="login"
-                    className="relative z-10 data-[state=active]:bg-[hsl(var(--brand-dark))] data-[state=active]:text-white data-[state=active]:shadow-sm transition-all duration-200 bg-white text-gray-600 text-sm"
-                  >
-                    Accedi
-                  </TabsTrigger>
-                  <TabsTrigger
-                    value="register"
-                    className="relative z-10 data-[state=active]:bg-[hsl(var(--brand-dark))] data-[state=active]:text-white data-[state=active]:shadow-sm transition-all duration-200 bg-white text-gray-600 text-sm"
-                  >
-                    Registrati
-                  </TabsTrigger>
-                </TabsList>
-
-                {/* Login Tab */}
-                <TabsContent value="login" className="space-y-3 mt-4">
-                  <LoginForm
-                    form={loginForm}
-                    onSubmit={onPasswordLogin}
-                    loginMethod={loginMethod}
-                    toggleMethod={() => {}}
-                    onGoogle={() => { /* Google login disabled for now */ }}
-                    loading={loginMutation.isPending}
-                    googleLoading={!gisReady}
-                    googleError={null}
-                  />
-                  <div className="mt-1 text-right">
-                    <Link href="/auth/forgot-password" className="text-sm text-[var(--brand-accent-strong)] hover:underline">
-                      Password dimenticata?
-                    </Link>
+            {/* Login Tab */}
+            <TabsContent value="login" className="auth-rise mt-0 flex flex-col gap-[14px]">
+              <LoginForm
+                form={loginForm}
+                onSubmit={onPasswordLogin}
+                loginMethod={loginMethod}
+                toggleMethod={() => {}}
+                onGoogle={() => { /* Google login disabled for now */ }}
+                loading={loginMutation.isPending}
+                googleLoading={!gisReady}
+                googleError={null}
+              />
+              <div className="-mt-1 text-right">
+                <Link href="/auth/forgot-password" className="text-[13px] font-medium text-[hsl(var(--brand-dark))] hover:underline">
+                  Password dimenticata?
+                </Link>
+              </div>
+              {googleEnabled && (
+                <>
+                  <div className="flex items-center gap-2.5 text-xs text-[#9a948a] before:h-px before:flex-1 before:bg-[#e4e0d6] before:content-[''] after:h-px after:flex-1 after:bg-[#e4e0d6] after:content-['']">
+                    oppure
                   </div>
-                  {googleEnabled && (
-                    <div className="mt-2"><div id="google-login-btn" className="flex justify-center" /></div>
-                  )}
-                </TabsContent>
+                  <div id="google-login-btn" className="flex justify-center" />
+                </>
+              )}
+            </TabsContent>
 
-                {/* Register Tab */}
-                <TabsContent value="register" className="space-y-3 mt-4">
-                  <RegisterForm
-                    form={registerForm}
-                    onSubmit={onRegister}
-                    signupMethod={signupMethod}
-                    loading={registerMutation.isPending}
-                    googleError={null}
-                  />
-                  {googleEnabled && (
-                    <div className="mt-2"><div id="google-signup-btn" className="flex justify-center" /></div>
-                  )}
-                </TabsContent>
-              </Tabs>
-            </CardContent>
-          </Card>
+            {/* Register Tab */}
+            <TabsContent value="register" className="auth-rise mt-0 flex flex-col gap-[14px]">
+              <p className="-mt-1 text-[13px] leading-snug text-[#6b665d]">
+                Accumula punti ogni acquisto, e goditi i premi direttamente in cassa. Ci vogliono 30 secondi.
+              </p>
+              <RegisterForm
+                form={registerForm}
+                onSubmit={onRegister}
+                signupMethod={signupMethod}
+                loading={registerMutation.isPending}
+                googleError={null}
+              />
+              {googleEnabled && (
+                <div id="google-signup-btn" className="flex justify-center empty:hidden" />
+              )}
+            </TabsContent>
+          </Tabs>
+
+          <p className="pt-4 text-center lg:pt-1.5 text-[11px] tracking-[0.02em] text-[#a39d92]">
+            Fidelity by <b className="font-semibold text-[#8a8478]">Returnacy</b>
+          </p>
         </div>
       </div>
     </div>

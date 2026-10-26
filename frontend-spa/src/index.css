@@ -151,3 +151,17 @@
 .scrollbar-hide::-webkit-scrollbar { 
   display: none;  /* Safari and Chrome */
 }
+
+/* Auth page motion: the incoming tab panel rises into place, the hero card
+   resizes and the segmented-control pill slides. One easing curve, no bounce. */
+@keyframes auth-rise {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: none; }
+}
+@media (prefers-reduced-motion: no-preference) {
+  .auth-rise { animation: auth-rise .26s cubic-bezier(.2,.7,.2,1) both; }
+  .auth-hero { transition: padding .32s cubic-bezier(.4,0,.2,1); }
+  .auth-card { transition: width .32s cubic-bezier(.4,0,.2,1), max-width .32s cubic-bezier(.4,0,.2,1), margin .32s cubic-bezier(.4,0,.2,1); }
+  .auth-seg-pill { transition: transform .28s cubic-bezier(.4,0,.2,1); }
+  .auth-seg-tab { transition: color .2s; }
+}
