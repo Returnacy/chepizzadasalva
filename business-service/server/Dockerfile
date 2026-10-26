@@ -1,7 +1,7 @@
 ###############################################
 # Build stage
 ###############################################
-FROM node:20-bullseye-slim AS build
+FROM node:20-bookworm-slim AS build
 WORKDIR /app
 
 # Copy workspace manifests
@@ -38,9 +38,14 @@ RUN pnpm --filter @business-service/db install --prod --no-optional --frozen-loc
 ###############################################
 # Runtime stage
 ###############################################
-FROM node:20-bullseye-slim
+FROM node:20-bookworm-slim
 ENV NODE_ENV=production NODE_PATH=/app/db/node_modules
 WORKDIR /app
+
+# bookworm-slim non include libssl3: serve al query engine Prisma (debian-openssl-3.0.x)
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends openssl ca-certificates \
+    && rm -rf /var/lib/apt/lists/*
 
 COPY --from=build /app/node_modules ./node_modules
 COPY --from=build /app/package.json /app/pnpm-workspace.yaml /app/tsconfig.base.json ./
