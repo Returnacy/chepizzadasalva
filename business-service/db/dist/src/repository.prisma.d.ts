@@ -5,6 +5,7 @@ export declare class RepositoryPrisma {
     private _walletScope;
     private _brandBusinessIds;
     constructor();
+    ping(): Promise<void>;
     getWalletScope(): Promise<WalletScope>;
     getBrandBusinessIds(): Promise<string[]>;
     isBusinessInBrand(businessId: string): Promise<boolean>;

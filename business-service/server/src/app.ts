@@ -12,6 +12,7 @@ import { registerCouponsRoutes } from './routes/coupons.routes.js';
 import { registerUsersRoutes } from './routes/users.routes.js';
 import { registerAnalyticsRoutes } from './routes/analytics.routes.js';
 import { registerWalletRoutes } from './routes/wallet.routes.js';
+import { registerHealthRoutes } from './routes/health.routes.js';
 
 export async function buildApp() {
   const app = Fastify({ logger: true });
@@ -20,7 +21,7 @@ export async function buildApp() {
   await app.register(userAuthPlugin);
   await app.register(prismaRepositoryPlugin);
 
-  app.get('/health', async () => ({ status: 'ok' }));
+  registerHealthRoutes(app);
 
   const baseAllowedRoles = new Set(['admin', 'brand_manager', 'manager', 'owner', 'staff']);
   const allowedServices = new Set(
@@ -44,7 +45,7 @@ export async function buildApp() {
   app.addHook('preHandler', async (request, reply) => {
     if (request.method === 'OPTIONS') return;
     const path = request.routerPath || (request.raw?.url ? request.raw.url.split('?')[0] : undefined);
-    if (path === '/health') return;
+    if (request.routeOptions?.config?.public === true) return;
     const auth = (request as any).auth;
     const routeConfig = (request as any).routeConfig ?? request.routeOptions?.config ?? {};
     const allowUserAccess = routeConfig && routeConfig.allowUserAccess === true;

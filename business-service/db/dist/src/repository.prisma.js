@@ -9,6 +9,10 @@ export class RepositoryPrisma {
         this.brandId = env.DEFAULT_BRAND_ID ?? '385d4ebb-4c4b-46e9-8701-0d71bfd7ce47';
         this.businessId = env.DEFAULT_BUSINESS_ID ?? 'af941888-ec4c-458e-b905-21673241af3e';
     }
+    // Cheapest query that proves the Prisma engine loaded and Postgres answers.
+    async ping() {
+        await prisma.$queryRaw `SELECT 1`;
+    }
     // --- Wallet scope -----------------------------------------------------------
     // A brand's wallet is either per-location (LOCATION, default) or shared across
     // all its locations (BRAND). Reads that compute a customer's balance/progression
