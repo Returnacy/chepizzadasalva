@@ -12,13 +12,14 @@ import { registerCouponsRoutes } from './routes/coupons.routes.js';
 import { registerUsersRoutes } from './routes/users.routes.js';
 import { registerAnalyticsRoutes } from './routes/analytics.routes.js';
 import { registerWalletRoutes } from './routes/wallet.routes.js';
+import { registerHealthRoutes } from './routes/health.routes.js';
 export async function buildApp() {
     const app = Fastify({ logger: true });
     await app.register(cors, { origin: true });
     await app.register(keycloakAuthPlugin);
     await app.register(userAuthPlugin);
     await app.register(prismaRepositoryPlugin);
-    app.get('/health', async () => ({ status: 'ok' }));
+    registerHealthRoutes(app);
     const baseAllowedRoles = new Set(['admin', 'brand_manager', 'manager', 'owner', 'staff']);
     const allowedServices = new Set((process.env.KEYCLOAK_SERVICE_AUDIENCE || 'campaign-service,messaging-service,user-service,business-service')
         .split(',')
@@ -38,7 +39,7 @@ export async function buildApp() {
         if (request.method === 'OPTIONS')
             return;
         const path = request.routerPath || (request.raw?.url ? request.raw.url.split('?')[0] : undefined);
-        if (path === '/health')
+        if (request.routeOptions?.config?.public === true)
             return;
         const auth = request.auth;
         const routeConfig = request.routeConfig ?? request.routeOptions?.config ?? {};

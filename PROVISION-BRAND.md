@@ -562,10 +562,18 @@ Dockerfile del business-service.
 Poi: Railway → Settings → custom domain `<slug>.business.returnacy.app`, e tornare
 al §2 per il CNAME (**e l'eventuale TXT**) su Porkbun.
 
-**Health check**: il servizio risponde **401 a tutto**, `/health` **incluso** (il
-plugin di auth gira prima dell'esenzione — confermato su entrambi i clienti). Un
-401 significa "vivo", ma **non esiste un health check usabile da un probe
-esterno**: non configurarne uno che si aspetti 200.
+**Health check**: `GET /health` è **pubblica** (nessun token): fa un `SELECT 1`
+via Prisma e risponde 200 `{"status":"ok","db":"ok"}`, oppure **503**
+`{"status":"degraded","db":"error"}` se il DB non risponde entro 3 s. Su Railway →
+Settings del servizio impostare **Healthcheck Path = `/health`** (il timeout di
+default di 300 s va bene, oppure `RAILWAY_HEALTHCHECK_TIMEOUT_SEC=120`): così un
+container che parte ma non carica Prisma o non raggiunge Postgres non sostituisce
+quello vivo.
+
+Impostarlo **solo dopo** che il codice con la rotta è deployato: il codice
+precedente risponde 401 anche su `/health` e il deploy fallirebbe. Ricorda che i
+tre business-service (Che Pizza, sudest, quieora) sono git-connessi a `main` con
+root directory `business-service`: **un push = deploy di tutti e tre**.
 
 ---
 

@@ -25,6 +25,9 @@ export default fp(async (fastify) => {
   fastify.decorateRequest('auth', null as any);
 
   fastify.addHook('preHandler', async (request, reply) => {
+    // Only routes that declare `config: { public: true }` skip auth (today: GET /health).
+    // Unmatched URLs carry the 404 route's config, so they stay behind auth.
+    if (request.routeOptions?.config?.public === true) return;
     try {
       const authHeader = request.headers['authorization'];
       if (!authHeader || typeof authHeader !== 'string' || !authHeader.startsWith('Bearer ')) {
