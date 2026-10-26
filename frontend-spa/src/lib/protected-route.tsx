@@ -1,8 +1,9 @@
 import React from "react";
 import { useAuth } from "../hooks/use-auth";
-import { getTenantContext, getRolesForContext } from "./authz";
+import { getTenantContext, getRolesForContext, isTenantMember } from "./authz";
 import { Loader2 } from "lucide-react";
 import { Redirect, Route } from "wouter";
+import { NotEnrolledScreen } from "../features/auth/components/NotEnrolledScreen";
 
 interface ProtectedRouteProps {
   path: string;
@@ -17,7 +18,7 @@ export function ProtectedRoute({
   allowedRoles,
   requireAuth = true,
 }: ProtectedRouteProps) {
-  const { user, isLoading } = useAuth();
+  const { user, isLoading, logoutMutation } = useAuth();
   const ctx = getTenantContext();
   const roles = getRolesForContext(user as any, ctx);
 
@@ -36,6 +37,15 @@ export function ProtectedRoute({
     return (
       <Route path={path}>
         <Redirect to="/auth" />
+      </Route>
+    );
+  }
+
+  // Logged in, but not a member of this brand: nothing here would load for them.
+  if (user && !isTenantMember(user as any, ctx)) {
+    return (
+      <Route path={path}>
+        <NotEnrolledScreen onLogout={() => logoutMutation.mutate()} loggingOut={logoutMutation.isPending} />
       </Route>
     );
   }

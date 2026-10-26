@@ -19,7 +19,7 @@ import {
 import { useAuth } from "../hooks/use-auth";
 import { useChiusuraHandoff } from "../features/scan/hooks/useChiusuraHandoff";
 import { authorizer } from "../lib/policy";
-import { getTenantContext, getHighestRole } from "../lib/authz";
+import { getTenantContext, getHighestRole, isTenantMember } from "../lib/authz";
 import { Button } from "../components/ui/button";
 import { useState, useEffect, useRef } from "react";
 import { BRAND } from '../config/brand';
@@ -128,8 +128,9 @@ export function Navigation() {
     }
   }, [user, allowedNavItems]);
 
-  // Don't show navigation if user is not authenticated
-  if (!user) {
+  // Don't show navigation if user is not authenticated, or not a member of this
+  // brand (ProtectedRoute shows the full-screen "not enrolled here" page instead)
+  if (!user || !isTenantMember(user as any, ctx)) {
     return null;
   }
 
