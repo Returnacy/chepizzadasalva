@@ -16,8 +16,16 @@ import type { CouponType } from '../types/coupon';
 import { isCouponActive } from '../lib/coupons';
 import { useAuth } from '../hooks/use-auth';
 import { getRolesForContext } from '../lib/authz';
+import type { ScanPath } from '../lib/posthog';
 
 const DEFAULT_CYCLE_SIZE = 15;
+
+// How the customer/coupon on screen got here, for analytics: handleScan tags its
+// redirect with the scanner mode, the CRM tags its link with 'crm'.
+function scanPathFromUrl(): ScanPath | undefined {
+  const via = new URLSearchParams(window.location.search).get('via');
+  return via === 'crm' || via === 'qr_camera' || via === 'qr_manual' ? via : undefined;
+}
 
 function normalizeScannedUser(rawUser: any, options: { userId: string; fallback?: any; progression?: { stampsLastPrize?: number; stampsNextPrize?: number; nextPrizeName?: string } }) {
   const fallback = options?.fallback ?? {};
@@ -313,7 +321,7 @@ export default function ScanQRPage() {
         throw new Error('User ID mancante per aggiunta timbri');
       }
       const endpointUserId = String(userId).trim();
-      const updated = await addStampsLegacy(endpointUserId, Number(stamps));
+      const updated = await addStampsLegacy(endpointUserId, Number(stamps), scanPathFromUrl());
       window.location.reload(); // Reload to refresh user data
       console.log('[addStamps][mutationFn] response', updated);
       return updated;
@@ -361,7 +369,7 @@ export default function ScanQRPage() {
       if (!targetId) {
         throw new Error('Impossibile riscattare il coupon senza un identificativo valido.');
       }
-      await redeemCouponLegacy(targetId, { override });
+      await redeemCouponLegacy(targetId, { override, path: scanPathFromUrl() });
       return { code: coupon.code ?? coupon.qrCode ?? String(targetId), isRedeemed: true, redeemedAt: new Date().toISOString() };
     },
     onSuccess: (redeemedCoupon: { code: string; isRedeemed: boolean; redeemedAt?: string }, variables: { coupon: CouponType; override?: boolean }) => {
@@ -442,6 +450,7 @@ export default function ScanQRPage() {
     }
     if (resolvingScan) return;
     setResolvingScan(true);
+    const via: ScanPath = scanMode === 'manual' ? 'qr_manual' : 'qr_camera';
 
     try {
       // If already a full scan-qr URL (customer or coupon), normalize and go
@@ -449,6 +458,7 @@ export default function ScanQRPage() {
         const base = (import.meta as any).env?.VITE_FRONTEND_BASE_URL || window.location.origin;
         try {
           const url = new URL(raw, base);
+          url.searchParams.set('via', via);
           window.location.href = url.toString();
         } catch {
           window.location.href = raw;
@@ -486,7 +496,7 @@ export default function ScanQRPage() {
       }
       const base = (import.meta as any).env?.VITE_FRONTEND_BASE_URL || window.location.origin;
       const paramName = isUser ? 'customer' : 'coupon';
-      const target = `${base.replace(/\/$/, '')}/scan-qr?${paramName}=${encodeURIComponent(raw)}`;
+      const target = `${base.replace(/\/$/, '')}/scan-qr?${paramName}=${encodeURIComponent(raw)}&via=${via}`;
       window.location.href = target;
     } finally {
       setResolvingScan(false);
@@ -599,7 +609,8 @@ export default function ScanQRPage() {
                   variant="outline"
                   onClick={() => {
                     const base = (import.meta as any).env?.VITE_FRONTEND_BASE_URL || window.location.origin;
-                    const target = `${base.replace(/\/$/, '')}/scan-qr?coupon=${encodeURIComponent(firstValidCouponCode)}`;
+                    const via = scanPathFromUrl();
+                    const target = `${base.replace(/\/$/, '')}/scan-qr?coupon=${encodeURIComponent(firstValidCouponCode)}${via ? `&via=${via}` : ''}`;
                     window.location.href = target;
                   }}
                 >

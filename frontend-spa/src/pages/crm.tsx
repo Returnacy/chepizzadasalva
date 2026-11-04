@@ -55,6 +55,7 @@ import { getTenantContext } from '../lib/authz';
 import { useAuth } from '../hooks/use-auth';
 import { apiRequest as rawApiRequest } from '../lib/queryClient';
 import { getUserCoupons, redeemCoupon } from '../lib/legacy-api-adapter';
+import { track } from '../lib/posthog';
 import type { CouponType } from '../types/coupon';
 
 type SortField = 'name' | 'stamps' | 'coupons' | 'lastVisit';
@@ -208,14 +209,14 @@ export default function CRMPage() {
 
   // Navigate to Scanner QR page with customer details
   const navigateToStampManagement = (customer: UserType) => {
-    setLocation(`/scan-qr?customer=${encodeURIComponent(customer.id)}`);
+    setLocation(`/scan-qr?customer=${encodeURIComponent(customer.id)}&via=crm`);
   };
 
   // Redeem coupon mutation for staff-assisted redemption
   const redeemCouponMutation = useMutation({
     mutationFn: async ({ coupon, customer }: { coupon: CouponType; customer: UserType }) => {
       if (!coupon?.id) throw new Error('Coupon senza identificativo valido');
-      await redeemCoupon(coupon.id);
+      await redeemCoupon(coupon.id, { path: 'crm' });
       return { coupon, customer };
     },
     onSuccess: ({ coupon, customer }) => {
@@ -686,7 +687,7 @@ export default function CRMPage() {
             <div className="grid gap-4">
               {customers.map((customer: UserType) => (
                 <div key={customer.id}>
-                  <CustomerListItem customer={customer} onSelect={setSelectedCustomer} />
+                  <CustomerListItem customer={customer} onSelect={(c) => { track('crm_customer_opened'); setSelectedCustomer(c); }} />
                 </div>
               ))}
             </div>
