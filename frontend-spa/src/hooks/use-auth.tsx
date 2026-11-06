@@ -1,4 +1,4 @@
-import React, { createContext, ReactNode, useContext } from "react";
+import React, { createContext, ReactNode, useContext, useEffect } from "react";
 import { getHighestRole, getTenantContext } from "../lib/authz";
 import { useQuery, useMutation, UseMutationResult } from "@tanstack/react-query";
 // User type still sourced from compatibility barrel for now; can be migrated later
@@ -11,6 +11,7 @@ import { queryClient } from "../lib/queryClient";
 import { useToast } from "../hooks/use-toast";
 import { getCurrentUser, login, logout, registerUser } from "../lib/legacy-api-adapter";
 import { ClientType } from "../types/client";
+import { analyticsRole, identifyUser } from "../lib/posthog";
 
 // Helper: determine redirect path based on highest tenant-scoped role
 function getRoleBasedRedirectFor(user: any): string {
@@ -43,6 +44,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     queryFn: getCurrentUser,
     retry: false,
   });
+
+  const userId = (user as any)?.id ? String((user as any).id) : null;
+  const role = analyticsRole(getHighestRole(user as any, getTenantContext()));
+  useEffect(() => {
+    if (userId) identifyUser(userId, role);
+  }, [userId, role]);
 
   const loginMutation = useMutation<ClientType, Error, LoginInput>({
     mutationFn: async (credentials) => {

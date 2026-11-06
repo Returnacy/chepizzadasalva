@@ -28,6 +28,7 @@ import { type SignupInput } from '../schema/signup/signup.schema';
 import type { ClientType } from '../types/client.d.ts';
 import { CouponType } from '../types/coupon';
 import { getHighestRole, getTenantContext } from './authz';
+import { resetAnalytics, track, type ScanPath } from './posthog';
 
 // Legacy types that the UI expects
 export interface User {
@@ -111,6 +112,7 @@ export async function logout(): Promise<void> {
   } finally {
     tokenService.clearAccessToken();
     tokenService.clearRefreshToken?.();
+    resetAnalytics();
   }
 }
 
@@ -168,6 +170,7 @@ export async function registerUser(userData: SignupInput): Promise<any> {
       const hr = getHighestRole(userPayload, getTenantContext());
       if (hr) (userPayload as any).role = hr;
     } catch {}
+    track('signup_completed', { method: userData.authType === 'password' ? 'email' : userData.provider });
     return userPayload;
   } catch (error) {
     throw normalizeError(error);
@@ -445,7 +448,7 @@ export async function deleteCustomer(userId: number): Promise<void> {
 /**
  * Loyalty and stamps functions
  */
-export async function addStamps(userId: string | number, stamps: number): Promise<ClientType> {
+export async function addStamps(userId: string | number, stamps: number, path?: ScanPath): Promise<ClientType> {
   try {
     const businessId = getBusinessId();
     const count = Math.max(1, Math.floor(Number(stamps) || 1));
@@ -454,6 +457,7 @@ export async function addStamps(userId: string | number, stamps: number): Promis
       throw new Error('User ID non valido per aggiungere timbri');
     }
     await businessHttp.post<any>(`/api/v1/stamps/apply`, { userId: uid, businessId, stamps: count });
+    track('stamp_added', path ? { path } : undefined);
     // Refresh user from user-service to reflect updated counters
     return getUser(uid);
   } catch (error) {
@@ -526,7 +530,7 @@ export async function getCouponByCode(code: string): Promise<CouponType | null> 
   }
 }
 
-export async function redeemCoupon(couponId: string | number, opts?: { override?: boolean }): Promise<{ success: boolean }> {
+export async function redeemCoupon(couponId: string | number, opts?: { override?: boolean; path?: ScanPath }): Promise<{ success: boolean }> {
   try {
     // Pass the staff's current location so the redemption is attributed to where
     // it happened (may differ from where the coupon was earned under a shared wallet).
@@ -535,6 +539,7 @@ export async function redeemCoupon(couponId: string | number, opts?: { override?
       businessId: getBusinessId(),
       override: opts?.override === true ? true : undefined,
     });
+    track('coupon_redeemed', opts?.path ? { path: opts.path } : undefined);
     return { success: true };
   } catch (error) {
     throw normalizeError(error);

@@ -13,6 +13,7 @@ import { hasAnyRole } from '../../../lib/authz';
 import { userHttp, businessHttp } from '../../../lib/servicesHttp';
 import { getSelectedLocation, setSelectedLocation } from '../../../lib/staffLocation';
 import { PM_URL } from '../../../config/brand';
+import { track } from '../../../lib/posthog';
 
 type Loc = { id: string; name: string; address?: string };
 
@@ -43,6 +44,7 @@ export function useChiusuraHandoff() {
       // for backwards compatibility, but PizzeriaManager prefers the claim —
       // see user-service/docs/SSO-PM-CONTRACT.md §4.
       const res = await userHttp.post<{ token: string; expiresIn: number }>('/api/v1/auth/pm-handoff', { businessId });
+      track('pm_chiusura_opened', { source: 'returnacy' });
       const url = `${PM_URL}/sso#token=${res.token}&loc=${businessId}&locName=${encodeURIComponent(name || '')}`;
       window.location.href = url; // navigation away — no need to clear pending
     } catch (e) {

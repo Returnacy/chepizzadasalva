@@ -638,15 +638,24 @@ VITE_CAMPAIGN_SERVICE_URL=<campaign-service>      # campagne congelate: si OMETT
 VITE_PM_URL=<PizzeriaManager del cliente>
 VITE_FRONTEND_BASE_URL=https://<slug>.returnacy.app
 VITE_GOOGLE_LOGIN_ENABLED=true                    # opzionale, solo dopo §13
+VITE_POSTHOG_KEY=<phc_… progetto PostHog PizzeriaOS>  # opzionale: assente = telemetria spenta
+VITE_POSTHOG_HOST=https://eu.i.posthog.com        # opzionale, è già il default
+VITE_ANALYTICS_CLIENT=<slug analytics>             # chepizza | sudest | quieora | demo
 ```
 
-Due note sull'import:
+Tre note sull'import:
 
 - **`VITE_CAMPAIGN_SERVICE_URL` si omette** invece di impostarla vuota: il codice
   fa già fallback a stringa vuota, e una riga con valore vuoto può essere
   scartata o rifiutata dall'import.
 - **`VITE_GOOGLE_CLIENT_ID` non si mette qui**: è nel `.env.local` committato del
   repo e vale per tutti i brand. Da sola non accende niente — §13.
+- **Telemetria PostHog** (`src/lib/posthog.ts`, contratto in
+  `PizzeriaOS/PIZZERIA_OS_ANALYTICS.md`): le tre `VITE_POSTHOG_*`/`VITE_ANALYTICS_CLIENT`
+  sono opzionali e `check-brand` non le richiede. Senza `VITE_POSTHOG_KEY` la SPA
+  non inizializza PostHog e non invia niente. `VITE_ANALYTICS_CLIENT` va messa insieme alla chiave:
+  senza, gli eventi arrivano senza `client` e non si filtrano per cliente. Come
+  ogni `VITE_*`, si legge al build: dopo averle impostate serve un nuovo deploy.
 
 **Preview e Production hanno variabili separate.** Il progetto Pages builda come
 preview ogni branch di questo repo (`<branch>.<progetto>.pages.dev`), con le
