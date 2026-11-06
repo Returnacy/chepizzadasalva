@@ -78,8 +78,10 @@ export declare class RepositoryPrisma {
         userId: string;
         isRedeemed: boolean;
     }>;
+    addStamps(userId: string, businessId: string, count: number): Promise<import("@prisma/client").Prisma.BatchPayload>;
     listStamps(userId: string, businessId: string, filter?: {
         isRedeemed?: boolean;
+        take?: number;
     }): Promise<{
         id: string;
         createdAt: Date;
@@ -94,6 +96,7 @@ export declare class RepositoryPrisma {
         userId: string;
         isRedeemed: boolean;
     }>;
+    redeemStamps(stampIds: string[]): Promise<import("@prisma/client").Prisma.BatchPayload>;
     countValidStamps(userId: string, businessId: string): Promise<number>;
     createCoupon(userId: string, businessId: string, prizeId: string, code: string, expiredAt?: Date | null): Promise<{
         prize: {

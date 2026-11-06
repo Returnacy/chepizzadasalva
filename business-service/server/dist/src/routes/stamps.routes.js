@@ -3,6 +3,21 @@ import crypto from 'node:crypto';
 import { TokenService } from '../services/tokenService.js';
 import { UserServiceClient } from '../services/userServiceClient.js';
 export function registerStampsRoutes(app) {
+    // One client per app instance, built on first use: TokenService caches the
+    // service token, so reusing it saves a token mint per scan. Lazy because
+    // fromEnv() throws on missing config, and that must stay a logged sync
+    // failure, not a boot crash.
+    let userClient = null;
+    const getUserClient = () => {
+        if (!userClient) {
+            userClient = new UserServiceClient({
+                baseUrl: process.env.USER_SERVICE_URL || 'http://user-server:3000',
+                tokenService: TokenService.fromEnv(),
+                timeoutMs: 5000,
+            });
+        }
+        return userClient;
+    };
     app.post('/api/v1/stamps', async (request, reply) => {
         // Backward-compatible single-stamp endpoint (deprecated by batch below)
         const { userId, businessId } = request.body;
@@ -43,14 +58,14 @@ export function registerStampsRoutes(app) {
         if (!(await app.repository.isBusinessInBrand(input.businessId))) {
             return reply.code(400).send({ message: 'Unknown location for this brand' });
         }
-        // 1) Add N stamps in business DB
-        for (let i = 0; i < input.stamps; i++) {
-            await app.repository.addStamp(input.userId, input.businessId);
-        }
+        // 1) Add N stamps in business DB (single insert)
+        await app.repository.addStamps(input.userId, input.businessId, input.stamps);
         // 2) Compute valid stamps and evaluate next non-promotional prize entitlement
-        const validStamps = await app.repository.countValidStamps(input.userId, input.businessId);
-        const nextPrize = await app.repository.getNextNonPromotionalPrize(input.userId);
-        const lastPrize = await app.repository.getLastNonPromotionalPrize(input.userId);
+        const [validStamps, nextPrize, lastPrize] = await Promise.all([
+            app.repository.countValidStamps(input.userId, input.businessId),
+            app.repository.getNextNonPromotionalPrize(input.userId),
+            app.repository.getLastNonPromotionalPrize(input.userId),
+        ]);
         let stampsNeededForNextPrize;
         if (lastPrize && nextPrize) {
             if (lastPrize.pointsRequired < nextPrize.pointsRequired) {
@@ -71,50 +86,56 @@ export function registerStampsRoutes(app) {
             createdCoupon = await app.repository.createCoupon(input.userId, input.businessId, nextPrize.id, code, new Date(Date.now() + 30 * 24 * 60 * 60 * 1000));
             consumedStampsAfter = (lastPrize ? lastPrize.pointsRequired : 0) + nextPrize.pointsRequired;
             const stampsToRedeem = consumedStampsAfter;
-            const stamps = await app.repository.listStamps(input.userId, input.businessId, { isRedeemed: false });
-            let redeemedCount = 0;
-            for (const stamp of stamps) {
-                if (redeemedCount >= stampsToRedeem)
-                    break;
-                await app.repository.redeemStamp(stamp.id);
-                redeemedCount++;
-            }
+            // Oldest valid stamps first, redeemed in one update.
+            const stamps = await app.repository.listStamps(input.userId, input.businessId, { isRedeemed: false, take: stampsToRedeem });
+            await app.repository.redeemStamps(stamps.map((stamp) => stamp.id));
         }
-        // 3) Sync counters to user-service via internal service-auth endpoint.
-        // This is best-effort: the chepizza DB is the source of truth, so a sync
-        // failure must NOT cause the staff's request to fail. Otherwise the staff
-        // sees an error and assumes no coupon was created — but the coupon WAS
-        // created here in chepizza's DB and would only become visible on reload.
-        try {
-            const tokenService = TokenService.fromEnv();
-            const userClient = new UserServiceClient({
-                baseUrl: process.env.USER_SERVICE_URL || 'http://user-server:3000',
-                tokenService,
-                timeoutMs: 5000,
-            });
-            await userClient.updateMembershipCounters({
-                userId: input.userId,
-                businessId: input.businessId,
-                // Under a BRAND wallet the counters live on the brand-scoped membership,
-                // not on a per-location one (which may not exist for this location) — so
-                // tell user-service to resolve the membership by brand.
-                brandId: app.repository.brandId,
-                scope: await app.repository.getWalletScope(),
-                validStamps: createdCoupon ? validStamps - stampsNeededForNextPrize : validStamps,
-                validCoupons: createdCoupon ? 1 : 0,
-                totalStampsDelta: input.stamps,
-                totalCouponsDelta: createdCoupon ? 1 : 0,
-            });
-        }
-        catch (err) {
-            app.log.error({ err, userId: input.userId, businessId: input.businessId, couponCreated: !!createdCoupon }, '[business-service] membership counter sync to user-service failed; coupon and stamp redemption already persisted in chepizza DB');
-        }
-        return reply.code(200).send({
+        const remainingValidStamps = createdCoupon ? validStamps - stampsNeededForNextPrize : validStamps;
+        // Progression after this apply, same semantics as GET /api/v1/prizes/progression,
+        // so the staff app can redraw without another round trip. A new coupon moves
+        // the last/next prize, so re-read them only in that case.
+        const [lastPrizeAfter, nextPrizeAfter] = createdCoupon
+            ? await Promise.all([
+                app.repository.getLastNonPromotionalPrize(input.userId),
+                app.repository.getNextNonPromotionalPrize(input.userId),
+            ])
+            : [lastPrize, nextPrize];
+        reply.code(200).send({
             message: 'Stamps applied',
             data: {
-                validStamps: createdCoupon ? validStamps - stampsNeededForNextPrize : validStamps,
+                validStamps: remainingValidStamps,
                 createdCoupon: createdCoupon ? { id: createdCoupon.id, code: createdCoupon.code } : null,
+                nextPrize: {
+                    name: nextPrizeAfter?.name,
+                    stampsLastPrize: lastPrizeAfter ? Number(lastPrizeAfter.pointsRequired) : 0,
+                    stampsNextPrize: nextPrizeAfter ? Number(nextPrizeAfter.pointsRequired) : 0,
+                },
             },
         });
+        // 3) Sync counters to user-service via internal service-auth endpoint,
+        // after the response is out. This is best-effort: the chepizza DB is the
+        // source of truth, so a slow or failing sync must NOT hold up or fail the
+        // staff's request — the coupon and stamps are already persisted here.
+        void (async () => {
+            try {
+                await getUserClient().updateMembershipCounters({
+                    userId: input.userId,
+                    businessId: input.businessId,
+                    // Under a BRAND wallet the counters live on the brand-scoped membership,
+                    // not on a per-location one (which may not exist for this location) — so
+                    // tell user-service to resolve the membership by brand.
+                    brandId: app.repository.brandId,
+                    scope: await app.repository.getWalletScope(),
+                    validStamps: remainingValidStamps,
+                    validCoupons: createdCoupon ? 1 : 0,
+                    totalStampsDelta: input.stamps,
+                    totalCouponsDelta: createdCoupon ? 1 : 0,
+                });
+            }
+            catch (err) {
+                app.log.error({ err, userId: input.userId, businessId: input.businessId, couponCreated: !!createdCoupon }, '[business-service] membership counter sync to user-service failed; coupon and stamp redemption already persisted in chepizza DB');
+            }
+        })();
+        return reply;
     });
 }
