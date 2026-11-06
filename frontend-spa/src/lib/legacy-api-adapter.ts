@@ -448,18 +448,42 @@ export async function deleteCustomer(userId: number): Promise<void> {
 /**
  * Loyalty and stamps functions
  */
-export async function addStamps(userId: string | number, stamps: number, path?: ScanPath): Promise<ClientType> {
+export interface ApplyStampsResult {
+  validStamps: number;
+  createdCoupon: { id: string; code: string } | null;
+  // Absent from a business-service that predates it; callers keep their thresholds then.
+  nextPrize?: { name?: string; stampsLastPrize: number; stampsNextPrize: number };
+}
+
+export async function addStamps(userId: string | number, stamps: number, path?: ScanPath): Promise<ApplyStampsResult> {
   try {
     const businessId = getBusinessId();
-    const count = Math.max(1, Math.floor(Number(stamps) || 1));
+    // The backend only adds stamps; removing them has never been supported, so
+    // refuse anything below 1 instead of silently turning it into 1.
+    const count = Math.floor(Number(stamps));
+    if (!Number.isFinite(count) || count < 1) {
+      throw new Error('Numero di timbri non valido: si possono solo aggiungere timbri (minimo 1)');
+    }
     const uid = String(userId ?? '').trim();
     if (!uid || uid === 'undefined' || uid === 'null' || uid === 'NaN') {
       throw new Error('User ID non valido per aggiungere timbri');
     }
-    await businessHttp.post<any>(`/api/v1/stamps/apply`, { userId: uid, businessId, stamps: count });
+    const res = await businessHttp.post<any>(`/api/v1/stamps/apply`, { userId: uid, businessId, stamps: count });
     track('stamp_added', path ? { path } : undefined);
-    // Refresh user from user-service to reflect updated counters
-    return getUser(uid);
+    const data = (res as any)?.data ?? res;
+    const result: ApplyStampsResult = {
+      validStamps: Number(data?.validStamps ?? 0) || 0,
+      createdCoupon: data?.createdCoupon ?? null,
+    };
+    if (data?.nextPrize) {
+      // Same forward-target rule as getPrizeProgression: past the only prize,
+      // last == next, so point one cycle ahead.
+      const stampsLastPrize = Number(data.nextPrize.stampsLastPrize ?? 0) || 0;
+      let stampsNextPrize = Number(data.nextPrize.stampsNextPrize ?? 15) || 15;
+      if (stampsNextPrize <= stampsLastPrize) stampsNextPrize = stampsLastPrize + 15;
+      result.nextPrize = { name: data.nextPrize.name, stampsLastPrize, stampsNextPrize };
+    }
+    return result;
   } catch (error) {
     throw normalizeError(error);
   }

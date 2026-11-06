@@ -26,6 +26,14 @@ export function QRScanner({ onScan, onError }: QRScannerProps) {
   const [frontCamera, setFrontCamera] = useState<MediaDeviceInfo | null>(null);
   const [currentRearCameraIndex, setCurrentRearCameraIndex] = useState<number>(0);
   const [isUsingRearCamera, setIsUsingRearCamera] = useState<boolean>(true);
+  // Latest callbacks, read through refs so a parent re-render (a toast, a state
+  // change) never restarts the camera, and the decode callback never calls a stale one.
+  const onScanRef = useRef(onScan);
+  const onErrorRef = useRef(onError);
+  onScanRef.current = onScan;
+  onErrorRef.current = onError;
+  // One result per scanning run: the decoder can report the same QR again before stop lands.
+  const resultHandledRef = useRef(false);
 
   // Categorize cameras into rear and front
   const categorizeCameras = useCallback((videoDevices: MediaDeviceInfo[]) => {
@@ -85,7 +93,7 @@ export function QRScanner({ onScan, onError }: QRScannerProps) {
       setDevices(videoDevices);
       
       if (videoDevices.length === 0) {
-        onError?.("Nessuna fotocamera trovata sul dispositivo.");
+        onErrorRef.current?.("Nessuna fotocamera trovata sul dispositivo.");
         return;
       }
 
@@ -115,9 +123,9 @@ export function QRScanner({ onScan, onError }: QRScannerProps) {
       
     } catch (error) {
       console.error("Errore enumerazione dispositivi:", error);
-      onError?.("Impossibile accedere alle fotocamere disponibili.");
+      onErrorRef.current?.("Impossibile accedere alle fotocamere disponibili.");
     }
-  }, [codeReader, categorizeCameras, createCameraConstraints, onError]);
+  }, [codeReader, categorizeCameras, createCameraConstraints]);
 
   // Initialize camera system
   useEffect(() => {
@@ -141,11 +149,11 @@ export function QRScanner({ onScan, onError }: QRScannerProps) {
         setHasPermission(false);
         if (error instanceof Error) {
           if (error.name === 'NotAllowedError') {
-            onError?.("Accesso alla fotocamera negato. Concedi i permessi e riprova.");
+            onErrorRef.current?.("Accesso alla fotocamera negato. Concedi i permessi e riprova.");
           } else if (error.name === 'NotFoundError') {
-            onError?.("Nessuna fotocamera trovata sul dispositivo.");
+            onErrorRef.current?.("Nessuna fotocamera trovata sul dispositivo.");
           } else {
-            onError?.("Impossibile accedere alla fotocamera. Verifica i permessi.");
+            onErrorRef.current?.("Impossibile accedere alla fotocamera. Verifica i permessi.");
           }
         }
       }
@@ -166,7 +174,7 @@ export function QRScanner({ onScan, onError }: QRScannerProps) {
       reader.reset();
       navigator.mediaDevices.removeEventListener('devicechange', handleDeviceChange);
     };
-  }, [onError]);
+  }, []);
 
   // Setup cameras when codeReader is available and permissions granted
   useEffect(() => {
@@ -194,6 +202,7 @@ export function QRScanner({ onScan, onError }: QRScannerProps) {
 
     try {
       setIsScanning(true);
+      resultHandledRef.current = false;
       
       // Stop any existing streams first
       const videoElement = videoRef.current;
@@ -214,7 +223,9 @@ export function QRScanner({ onScan, onError }: QRScannerProps) {
         videoElement,
         (result, error) => {
           if (result) {
-            onScan(result.getText());
+            if (resultHandledRef.current) return;
+            resultHandledRef.current = true;
+            onScanRef.current(result.getText());
             stopScanning();
             return;
           }
