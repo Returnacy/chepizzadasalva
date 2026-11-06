@@ -40,14 +40,14 @@ export function UserResult({ user, stampCounter, onInc, onDec, onApply, applying
         </CardContent>
       </Card>
       <Card>
-        <CardHeader><CardTitle className="flex items-center space-x-2"><Plus className="w-6 h-6 text-green-600" /><span>Gestisci Timbri</span></CardTitle><p className="text-sm text-gray-600 mt-1">Aggiungi o rimuovi timbri (valori negativi per correzioni)</p></CardHeader>
+        <CardHeader><CardTitle className="flex items-center space-x-2"><Plus className="w-6 h-6 text-green-600" /><span>Gestisci Timbri</span></CardTitle><p className="text-sm text-gray-600 mt-1">Scegli quanti timbri aggiungere</p></CardHeader>
         <CardContent>
           <div className="flex items-center justify-center space-x-4 mb-6">
-            <Button onClick={onDec} disabled={applying || stampCounter <= -20} variant="outline" size="lg" className="w-16 h-16 rounded-full"><Minus className="w-6 h-6" /></Button>
+            <Button onClick={onDec} disabled={applying || stampCounter <= 1} variant="outline" size="lg" className="w-16 h-16 rounded-full"><Minus className="w-6 h-6" /></Button>
             <div className="w-24 h-16 flex items-center justify-center bg-white border-2 border-gray-300 rounded-lg"><span className="text-2xl font-bold text-gray-900">{stampCounter}</span></div>
             <Button onClick={onInc} disabled={applying || stampCounter >= 50} variant="outline" size="lg" className="w-16 h-16 rounded-full"><Plus className="w-6 h-6" /></Button>
           </div>
-          <Button onClick={onApply} disabled={applying || stampCounter === 0} className={`w-full py-4 text-lg font-semibold ${stampCounter>0 ? 'bg-green-600 hover:bg-green-700' : stampCounter<0 ? 'bg-red-600 hover:bg-red-700' : 'bg-gray-400'}`}>{applying ? 'Applicazione in corso...' : stampCounter>0 ? `Aggiungi ${stampCounter} ${stampCounter===1?'Timbro':'Timbri'}` : stampCounter<0 ? `Rimuovi ${Math.abs(stampCounter)} ${Math.abs(stampCounter)===1?'Timbro':'Timbri'}` : 'Seleziona quantità'}</Button>
+          <Button onClick={onApply} disabled={applying} className="w-full py-4 text-lg font-semibold bg-green-600 hover:bg-green-700">{applying ? 'Applicazione in corso...' : `Aggiungi ${stampCounter} ${stampCounter===1?'Timbro':'Timbri'}`}</Button>
           {applying && <div className="mt-4 text-center"><p className="text-gray-600">Modifica timbri in corso...</p></div>}
         </CardContent>
       </Card>

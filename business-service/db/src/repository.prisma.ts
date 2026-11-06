@@ -128,15 +128,23 @@ export class RepositoryPrisma {
     // data real while the brand wallet still aggregates across locations.
     return prisma.stamp.create({ data: { userId, businessId } });
   }
-  async listStamps(userId: string, businessId: string, filter?: { isRedeemed?: boolean }) {
+  // Batch variant of addStamp: N stamps for one visit in a single insert.
+  async addStamps(userId: string, businessId: string, count: number) {
+    return prisma.stamp.createMany({ data: Array.from({ length: count }, () => ({ userId, businessId })) });
+  }
+  async listStamps(userId: string, businessId: string, filter?: { isRedeemed?: boolean; take?: number }) {
     const where: any = { userId, businessId: await this.walletBusinessFilter(businessId) };
     if (filter?.isRedeemed !== undefined) {
       where.isRedeemed = filter.isRedeemed;
     }
-    return prisma.stamp.findMany({ where, orderBy: { createdAt: 'asc' } });
+    return prisma.stamp.findMany({ where, orderBy: { createdAt: 'asc' }, take: filter?.take });
   }
   async redeemStamp(stampId: string) {
     return prisma.stamp.update({ where: { id: stampId }, data: { isRedeemed: true } });
+  }
+  async redeemStamps(stampIds: string[]) {
+    if (stampIds.length === 0) return { count: 0 };
+    return prisma.stamp.updateMany({ where: { id: { in: stampIds } }, data: { isRedeemed: true } });
   }
   async countValidStamps(userId: string, businessId: string) {
     return prisma.stamp.count({ where: { userId, businessId: await this.walletBusinessFilter(businessId), isRedeemed: false } });
