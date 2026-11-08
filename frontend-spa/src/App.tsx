@@ -37,6 +37,8 @@ function Router() {
   <Route path="/verify-email" component={VerifyEmailPage} />
   {/* Alias for email verification links sent by backend */}
   <Route path="/email-verifications" component={VerifyEmailPage} />
+  {/* Path used by the user-service verification email (FRONTEND_VERIFY_EMAIL_URL) */}
+  <Route path="/auth/verify-email" component={VerifyEmailPage} />
       
       {/* Protected routes for all authenticated users */}
       <ProtectedRoute path="/" component={CustomerPage} />

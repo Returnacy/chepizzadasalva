@@ -24,7 +24,7 @@ export default function VerifyEmailPage() {
       // Validate presence of token per schema
       const parse = emailVerificationsSchema.safeParse({ token });
       if (!parse.success) {
-        setErrorMsg(parse.error.errors[0]?.message || "Invalid token");
+        setErrorMsg("Link di verifica incompleto: manca il codice. Apri di nuovo il link dall'email oppure richiedi una nuova email di verifica.");
         setStatus("error");
         return;
       }
@@ -33,11 +33,15 @@ export default function VerifyEmailPage() {
       setErrorMsg(null);
       try {
         const payload: EmailVerificationsInput = { token };
-        await http.post<{ message?: string }>("/auth/email-verifications", payload);
+        await http.post<{ ok?: boolean }>("/api/v1/auth/verify-email/confirm", payload);
         setStatus("success");
       } catch (e: any) {
-        const msg = e?.message || "Failed to verify email";
-        setErrorMsg(msg);
+        const code = e?.body?.error || e?.message;
+        setErrorMsg(
+          code === "INVALID_OR_EXPIRED_TOKEN"
+            ? "Link non valido o scaduto. Richiedi una nuova email di verifica dalla tua pagina."
+            : "Verifica non riuscita. Riprova più tardi."
+        );
         setStatus("error");
       }
     }
