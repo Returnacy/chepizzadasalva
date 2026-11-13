@@ -72,9 +72,12 @@ export default function CustomerPage() {
     refetchOnWindowFocus: true,
   });
 
-  // Derive values expected by existing UI (mock / fallback if absent)
-  const userData = client ? (() => {
-    const validStamps = client.stamps?.validStamps ?? 0;
+  // Derive values expected by existing UI (mock / fallback if absent).
+  // useAuth's user is the same /me payload as client, so when the profile query
+  // has no data (e.g. its fetch failed) it goes through the same normalisation.
+  const profile: ClientType | null = client ?? (user as any) ?? null;
+  const userData = profile ? (() => {
+    const validStamps = profile.stamps?.validStamps ?? 0;
 
     // Prefer the direct chepizza progression query (source of truth). Fall back
     // to /me's nextPrize for backwards compat during the deploy window; final
@@ -96,9 +99,9 @@ export default function CustomerPage() {
         const diff = progression.stampsNextPrize - validStamps;
         if (diff <= CYCLE_SIZE) return diff;
       }
-      if (typeof client.nextPrize?.stampsNeededForNextPrize === 'number'
-          && client.nextPrize.stampsNeededForNextPrize > 0) {
-        return client.nextPrize.stampsNeededForNextPrize;
+      if (typeof profile.nextPrize?.stampsNeededForNextPrize === 'number'
+          && profile.nextPrize.stampsNeededForNextPrize > 0) {
+        return profile.nextPrize.stampsNeededForNextPrize;
       }
       const positionInCycle = validStamps % CYCLE_SIZE;
       return positionInCycle === 0 ? CYCLE_SIZE : CYCLE_SIZE - positionInCycle;
@@ -108,37 +111,24 @@ export default function CustomerPage() {
     const totalStampsNeeded = Math.max(1, validStamps + stampsNeeded);
 
     const nextPrizeName = progression?.nextPrizeName
-      ?? client.nextPrize?.name
+      ?? profile.nextPrize?.name
       ?? 'Prossimo premio';
 
     return {
-      id: client.id,
-      name: client.profile?.name || client.profile?.surname || client.email?.split('@')[0] || 'Utente',
-      email: client.email || undefined,
-      phone: client.phone || undefined,
+      id: profile.id,
+      name: profile.profile?.name || profile.profile?.surname || profile.email?.split('@')[0] || 'Utente',
+      email: profile.email || undefined,
+      phone: profile.phone || undefined,
       stamps: validStamps,
       totalStamps: totalStampsNeeded,
       lastStamps: 0, // Always show progress from 0 in the visual
       requiredStamps: stampsNeeded,
       nextPrizeName,
-      totalCoupons: client.coupons?.usedCoupons ?? 0,
-      isEmailVerified: client.isVerified ?? true, // assume verified if flag not reliable
-      qrCode: `qr-${client.id}` // stub qrCode (backend to provide real code later)
+      totalCoupons: profile.coupons?.usedCoupons ?? 0,
+      isEmailVerified: profile.isVerified ?? true, // assume verified if flag not reliable
+      qrCode: `qr-${profile.id}` // stub qrCode (backend to provide real code later)
     };
-  })() : user ? {
-    id: user.id,
-    name: user.name,
-    email: user.email,
-    phone: (user as any).phone,
-    stamps: (user as any).stamps || 0,
-    totalStamps: (user as any).totalStamps || 0,
-    lastStamps: (user as any).lastStamps || 0,
-    requiredStamps: (user as any).requiredStamps || 0,
-    nextPrizeName: (user as any).nextPrizeName || 'Nessun premio',
-    totalCoupons: (user as any).totalCoupons || 0,
-    isEmailVerified: (user as any).isEmailVerified ?? true,
-    qrCode: (user as any).qr_code || 'qr-stub'
-  } : null;
+  })() : null;
 
   // Prefer the direct chepizza fetch; fall back to /me's nested list if the
   // direct call is still loading or returns null (filter to unredeemed + unexpired).
