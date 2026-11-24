@@ -3,6 +3,7 @@ import App from "./App";
 import { BRAND } from "./config/brand";
 import { applyBrandTheme } from "./config/theme";
 import { initAnalytics } from "./lib/posthog";
+import { captureHandoffFromUrl } from "./features/handoff/handoff";
 import "./index.css";
 
 // index.html ships a neutral title so the same HTML serves every brand; the
@@ -15,5 +16,9 @@ applyBrandTheme();
 
 // Before render, so the first pageview is captured. A no-op without VITE_POSTHOG_KEY.
 initAnalytics();
+
+// Before render, so ?handoff=<target> is remembered before any redirect to
+// /auth can drop the query string. See src/features/handoff/handoff.ts.
+captureHandoffFromUrl();
 
 createRoot(document.getElementById("root")!).render(<App />);

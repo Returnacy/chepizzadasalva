@@ -18,7 +18,11 @@ export type AnalyticsEvent =
   | 'stamp_added'
   | 'coupon_redeemed'
   | 'crm_customer_opened'
-  | 'pm_chiusura_opened';
+  | 'pm_chiusura_opened'
+  // Customer handoff (src/features/handoff): { target, source, reason? } — never the token.
+  | 'handoff_started'
+  | 'handoff_submitted'
+  | 'handoff_failed';
 
 /** How a stamp or coupon reached the counter: CRM page, or /scan-qr by camera or by hand. */
 export type ScanPath = 'crm' | 'qr_camera' | 'qr_manual';

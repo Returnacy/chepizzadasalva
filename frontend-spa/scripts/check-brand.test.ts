@@ -112,6 +112,46 @@ describe('check-brand.mjs', () => {
     expect(r.out).toContain('not a *.pages.dev URL');
   });
 
+  describe('optional handoff card', () => {
+    const CARD = {
+      VITE_HANDOFF_LINK_TARGET: 'promo-site',
+      VITE_HANDOFF_LINK_LABEL: 'Vai al sito promozioni',
+      VITE_HANDOFF_LINK_DESCRIPTION: 'Offerte riservate ai clienti',
+    };
+
+    it('is not required: brand env without it passes and reports it off', () => {
+      const r = run(BRAND);
+      expect(r.status).toBe(0);
+      expect(r.out).toContain('Handoff card: off');
+    });
+
+    it("complete card config passes, on a brand and on Che Pizza's own build", () => {
+      for (const env of [{ ...BRAND, ...CARD }, CARD]) {
+        const r = run(env);
+        expect(r.status).toBe(0);
+        expect(r.out).toContain('Handoff card: on (promo-site)');
+      }
+    });
+
+    it('rejects a malformed target', () => {
+      const r = run({ ...BRAND, ...CARD, VITE_HANDOFF_LINK_TARGET: 'Promo Site' });
+      expect(r.status).toBe(1);
+      expect(r.out).toContain('VITE_HANDOFF_LINK_TARGET must match');
+    });
+
+    it('rejects a target whose label was dropped (bulk import)', () => {
+      const r = run({ ...BRAND, VITE_HANDOFF_LINK_TARGET: 'promo-site' });
+      expect(r.status).toBe(1);
+      expect(r.out).toContain('VITE_HANDOFF_LINK_LABEL is empty');
+    });
+
+    it('rejects a label without a target', () => {
+      const r = run({ ...BRAND, VITE_HANDOFF_LINK_LABEL: 'Vai al sito promozioni' });
+      expect(r.status).toBe(1);
+      expect(r.out).toContain('VITE_HANDOFF_LINK_TARGET is empty');
+    });
+  });
+
   // The real file a client's Pages project imports, when this machine has it.
   const SUDEST = '/Volumes/manzDisk/ManzDisk_Coding/PizzeriaOS/clients/sudest/pages.env';
   it.skipIf(!existsSync(SUDEST))('Sud Est pages.env passes locally and on returnacy-sudest', () => {

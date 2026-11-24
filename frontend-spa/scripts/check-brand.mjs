@@ -126,6 +126,24 @@ if (googleLoginEnabled !== '' && googleLoginEnabled !== 'true' && googleLoginEna
   errors.push(`VITE_GOOGLE_LOGIN_ENABLED must be "true" or "false" (or unset), got "${googleLoginEnabled}"`);
 }
 
+// 3b. The optional customer-handoff card (src/features/handoff/handoff.ts,
+// getHandoffLink) needs a valid target key AND a label; the SPA silently shows
+// no card otherwise. The label is the half that goes missing: it carries
+// spaces, which the Cloudflare bulk import drops (failure mode 5).
+const HANDOFF_TARGET = /^[a-z0-9-]{1,40}$/;
+const handoffTarget = (env.VITE_HANDOFF_LINK_TARGET ?? '').trim();
+const handoffLabel = (env.VITE_HANDOFF_LINK_LABEL ?? '').trim();
+const handoffDescription = (env.VITE_HANDOFF_LINK_DESCRIPTION ?? '').trim();
+if (handoffTarget !== '' && !HANDOFF_TARGET.test(handoffTarget)) {
+  errors.push(`VITE_HANDOFF_LINK_TARGET must match ${HANDOFF_TARGET} (lowercase letters, digits, dashes), got "${handoffTarget}"`);
+}
+if (handoffTarget !== '' && handoffLabel === '') {
+  errors.push('VITE_HANDOFF_LINK_TARGET is set but VITE_HANDOFF_LINK_LABEL is empty: the card would not render');
+}
+if (handoffTarget === '' && (handoffLabel !== '' || handoffDescription !== '')) {
+  errors.push('VITE_HANDOFF_LINK_LABEL/DESCRIPTION are set but VITE_HANDOFF_LINK_TARGET is empty: the card would not render');
+}
+
 // 4. An empty VITE_BRAND_NAME means "Che Pizza's own build" — but only if the
 // env carries nothing else of a brand. Anything else set is a partial import
 // (see failure mode 5), and taking it for Che Pizza would skip every check
@@ -241,3 +259,4 @@ if (errors.length > 0) {
 const googleLoginOn = googleLoginEnabled === 'true' || isChePizza;
 console.log(`✔ Brand configuration OK (${isChePizza ? 'Che Pizza (defaults)' : brandName})`);
 console.log(`  Google login: ${googleLoginOn ? 'on' : 'off (button hidden)'}`);
+console.log(`  Handoff card: ${handoffTarget ? `on (${handoffTarget})` : 'off'}`);

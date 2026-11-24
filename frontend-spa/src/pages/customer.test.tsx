@@ -25,6 +25,10 @@ const ME = vi.hoisted(() => ({
 }));
 vi.mock('../hooks/use-auth', () => ({ useAuth: () => ({ user: ME }) }));
 
+// import.meta.env is inlined at build time; the handoff card reads it through buildEnv().
+const { env } = vi.hoisted(() => ({ env: {} as Record<string, string> }));
+vi.mock('../lib/build-env', () => ({ buildEnv: () => env }));
+
 let consoleError: ReturnType<typeof vi.spyOn>;
 
 async function renderPage() {
@@ -38,6 +42,7 @@ async function renderPage() {
 }
 
 beforeEach(() => {
+  for (const key of Object.keys(env)) delete env[key];
   for (const fn of Object.values(api)) fn.mockReset();
   api.getPrizeProgression.mockResolvedValue({ stampsLastPrize: 0, stampsNextPrize: 15 });
   api.getGoogleWalletStatus.mockResolvedValue({ configured: false, linked: false, objectId: null });
@@ -61,5 +66,63 @@ describe('CustomerPage — profile query without data', () => {
     await waitFor(() => expect(api.getClientProfile).toHaveBeenCalled());
     await waitFor(() => expect(page.getByText('7 / 15 Timbri')).toBeTruthy());
     expect(page.getByText('Ciao, Mario!')).toBeTruthy();
+  });
+});
+
+describe('CustomerPage — optional handoff card', () => {
+  async function renderWithHandoff() {
+    const { default: CustomerPage } = await import('./customer');
+    const { HandoffProvider } = await import('../features/handoff/HandoffProvider');
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    return render(
+      <QueryClientProvider client={client}>
+        <HandoffProvider>
+          <CustomerPage />
+        </HandoffProvider>
+      </QueryClientProvider>,
+    );
+  }
+
+  beforeEach(() => {
+    api.getClientProfile.mockResolvedValue(ME);
+  });
+
+  it('renders nothing when the brand has not configured it', async () => {
+    const page = await renderPage();
+    await waitFor(() => expect(page.getByText('7 / 15 Timbri')).toBeTruthy());
+    expect(page.queryByText('Vai al sito promozioni')).toBeNull();
+  });
+
+  it('renders nothing with a malformed target', async () => {
+    env.VITE_HANDOFF_LINK_TARGET = 'Promo Site';
+    env.VITE_HANDOFF_LINK_LABEL = 'Vai al sito promozioni';
+    const page = await renderWithHandoff();
+    await waitFor(() => expect(page.getByText('7 / 15 Timbri')).toBeTruthy());
+    expect(page.queryByText('Vai al sito promozioni')).toBeNull();
+  });
+
+  it('renders the configured card, and a tap starts the handoff to its target', async () => {
+    env.VITE_HANDOFF_LINK_TARGET = 'promo-site';
+    env.VITE_HANDOFF_LINK_LABEL = 'Vai al sito promozioni';
+    env.VITE_HANDOFF_LINK_DESCRIPTION = 'Offerte riservate ai clienti';
+    const fetchMock = vi.fn(async () => ({
+      ok: false,
+      status: 404,
+      statusText: 'Not Found',
+      headers: new Headers({ 'Content-Type': 'application/json' }),
+      json: async () => ({ error: 'UNKNOWN_HANDOFF_TARGET' }),
+    }));
+    vi.stubGlobal('fetch', fetchMock);
+
+    const page = await renderWithHandoff();
+    const card = await page.findByText('Vai al sito promozioni');
+    expect(page.getByText('Offerte riservate ai clienti')).toBeTruthy();
+
+    card.click();
+    await waitFor(() => expect(fetchMock).toHaveBeenCalled());
+    const [url, init] = fetchMock.mock.calls[0] as any[];
+    expect(String(url)).toMatch(/\/api\/v1\/auth\/handoff$/);
+    expect(JSON.parse(init.body)).toEqual({ target: 'promo-site' });
+    vi.unstubAllGlobals();
   });
 });

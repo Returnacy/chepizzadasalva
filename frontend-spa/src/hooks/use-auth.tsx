@@ -12,6 +12,7 @@ import { useToast } from "../hooks/use-toast";
 import { getCurrentUser, login, logout, registerUser } from "../lib/legacy-api-adapter";
 import { ClientType } from "../types/client";
 import { analyticsRole, identifyUser } from "../lib/posthog";
+import { hasPendingHandoff } from "../features/handoff/handoff";
 
 // Helper: determine redirect path based on highest tenant-scoped role
 function getRoleBasedRedirectFor(user: any): string {
@@ -19,6 +20,17 @@ function getRoleBasedRedirectFor(user: any): string {
   if (hr === 'admin' || hr === 'manager') return '/dashboard';
   if (hr === 'staff') return '/scan-qr';
   return '/';
+}
+
+// The hard redirect that follows login/registration. Skipped while a customer
+// handoff is pending: HandoffProvider takes over as soon as the user is in the
+// cache, and a page load here would cancel its request mid-flight.
+function redirectAfterAuth(user: any, delayMs: number) {
+  if (hasPendingHandoff()) return;
+  const redirectPath = getRoleBasedRedirectFor(user);
+  setTimeout(() => {
+    window.location.href = redirectPath;
+  }, delayMs);
 }
 
 type AuthContextType = {
@@ -60,10 +72,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       queryClient.setQueryData(["/me"], user);
       
       // Role-based redirect after successful login
-  const redirectPath = getRoleBasedRedirectFor(user);
-      setTimeout(() => {
-        window.location.href = redirectPath;
-      }, 500);
+      redirectAfterAuth(user, 500);
       
       toast({
         title: "Accesso effettuato",
@@ -106,10 +115,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         description: `Benvenuto, ${user.profile?.name}!`,
       });
       // Optional: role-based redirect similar to login for immediate UX consistency
-  const redirectPath = getRoleBasedRedirectFor(user);
-      setTimeout(() => {
-        window.location.href = redirectPath;
-      }, 600);
+      redirectAfterAuth(user, 600);
     },
     onError: (error: Error) => {
       console.error("Registration mutation error:", error);

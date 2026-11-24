@@ -12,6 +12,7 @@ import { useToast } from '../hooks/use-toast';
 import { tokenService } from '../lib/token-service';
 import { BRAND } from '../config/brand';
 import { getGoogleClientId, isGoogleLoginEnabled } from '../lib/brand-flags';
+import { hasPendingHandoff } from '../features/handoff/handoff';
 import loyaltyLogo from '@assets/che_pizza_fidelity_logo_horizontal.png';
 
 // Segmented-control trigger: transparent, so the sliding white pill behind it shows.
@@ -31,6 +32,8 @@ export default function AuthPage() {
   // State for GIS and active tab
   const [gisReady, setGisReady] = useState(false);
   const [activeTab, setActiveTab] = useState('login' as 'login' | 'register');
+  // Arrived through ?handoff=<target>: after signing in they go on, not to their card.
+  const [handoffPending] = useState(hasPendingHandoff);
 
   const loginForm = useLoginForm();
   const registerForm = useRegisterForm();
@@ -215,6 +218,11 @@ export default function AuthPage() {
       {/* Form sheet */}
       <div className="flex flex-none flex-col lg:items-center lg:justify-center lg:bg-gradient-to-br lg:from-[var(--brand-surface-from)] lg:to-[var(--brand-surface-to)] lg:p-8">
         <div className="relative -mt-[22px] flex flex-none flex-col gap-[14px] rounded-t-[26px] bg-white px-[22px] pb-[max(22px,env(safe-area-inset-bottom))] pt-[22px] text-[#1d1b18] lg:mt-0 lg:w-full lg:max-w-md lg:rounded-[26px] lg:shadow-[0_12px_40px_-16px_rgba(0,0,0,0.18)]">
+          {handoffPending && (
+            <p className="text-center text-[13px] leading-snug text-[#6b665d]">
+              Dopo l'accesso ti riportiamo dove eri rimasto.
+            </p>
+          )}
           <Tabs value={activeTab} onValueChange={(v: 'login' | 'register') => setActiveTab(v)} className="flex w-full flex-col gap-[14px]">
             <TabsList className="relative grid h-auto w-full grid-cols-2 rounded-[12px] bg-[#f6f4ef] p-1">
               <span
