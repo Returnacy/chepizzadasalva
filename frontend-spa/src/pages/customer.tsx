@@ -16,12 +16,15 @@ import { CouponType } from "../types/coupon";
 import { http } from "../lib/http";
 import { getBusinessId, userHttp } from "../lib/servicesHttp";
 import { BRAND } from '../config/brand';
+import { getHandoffLink } from '../features/handoff/handoff';
+import { HandoffLinkCard } from '../features/handoff/HandoffLinkCard';
 
 export default function CustomerPage() {
   const { toast } = useToast();
   const { user } = useAuth();
   const queryClient = useQueryClient();
   const businessId = getBusinessId();
+  const handoffLink = getHandoffLink();
 
   // Unified client profile query (backend now returns aggregated ClientType)
   const clientQuery = useQuery<ClientType | null>({
@@ -423,6 +426,8 @@ export default function CustomerPage() {
             )}
           </CardContent>
         </Card>
+
+        {handoffLink && <HandoffLinkCard link={handoffLink} />}
       </div>
     </div>
   );

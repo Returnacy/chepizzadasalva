@@ -641,6 +641,9 @@ VITE_GOOGLE_LOGIN_ENABLED=true                    # opzionale, solo dopo §13
 VITE_POSTHOG_KEY=<phc_… progetto PostHog PizzeriaOS>  # opzionale: assente = telemetria spenta
 VITE_POSTHOG_HOST=https://eu.i.posthog.com        # opzionale, è già il default
 VITE_ANALYTICS_CLIENT=<slug analytics>             # chepizza | sudest | quieora | demo
+VITE_HANDOFF_LINK_TARGET=<chiave target handoff>   # opzionale: assente = nessuna card
+VITE_HANDOFF_LINK_LABEL=<testo della card>          # obbligatoria se c'è il TARGET
+VITE_HANDOFF_LINK_DESCRIPTION=<riga sotto il testo> # opzionale
 ```
 
 Tre note sull'import:
@@ -656,6 +659,19 @@ Tre note sull'import:
   non inizializza PostHog e non invia niente. `VITE_ANALYTICS_CLIENT` va messa insieme alla chiave:
   senza, gli eventi arrivano senza `client` e non si filtrano per cliente. Come
   ogni `VITE_*`, si legge al build: dopo averle impostate serve un nuovo deploy.
+
+**Handoff verso un altro servizio del brand** (`src/features/handoff/`), tutto
+opzionale: senza queste variabili non cambia niente. Il passaggio di sessione
+vero e proprio parte da un link `?handoff=<target>` verso qualunque pagina della
+SPA, e non ha bisogno di nessuna variabile qui: la SPA chiede a user-service un
+token per quel target (`POST /api/v1/auth/handoff`) e lo consegna con un POST
+all'URL che user-service ha configurato per il target — il client non sceglie mai
+la destinazione. Le tre `VITE_HANDOFF_LINK_*` aggiungono solo una card sulla pagina
+cliente che fa lo stesso passaggio: `TARGET` è la chiave registrata su
+user-service (minuscole, cifre, trattini, max 40), `LABEL` il testo della card,
+`DESCRIPTION` una riga facoltativa sotto. Finché user-service non conosce il
+target risponde 404: dal link il cliente resta sulla sua carta, dalla card vede
+un avviso neutro.
 
 **Preview e Production hanno variabili separate.** Il progetto Pages builda come
 preview ogni branch di questo repo (`<branch>.<progetto>.pages.dev`), con le
@@ -711,6 +727,10 @@ set con la tinta del brand distrugge il set.
   build rotta di sudest è passata verde. L'errore elenca le chiavi trovate;
 - un `VITE_GOOGLE_LOGIN_ENABLED` che non sia esattamente `true` o `false` (un
   typo leggerebbe "off" in silenzio).
+- una card di handoff a metà: `VITE_HANDOFF_LINK_TARGET` che non è una chiave
+  valida (`^[a-z0-9-]{1,40}$`), un `TARGET` senza `LABEL` (la label ha spazi,
+  quindi è quella che l'import in blocco scarta) o `LABEL`/`DESCRIPTION` senza
+  `TARGET`. In tutti e tre i casi la SPA non mostrerebbe la card, senza avvisi.
 
 Provarlo in locale prima di configurare Cloudflare, e provarlo **dal file che si
 importerà davvero**:
