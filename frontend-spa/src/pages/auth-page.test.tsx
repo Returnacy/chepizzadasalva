@@ -102,3 +102,27 @@ describe('AuthPage — loyalty copy', () => {
     expect(container.textContent).not.toMatch(/pizza gratuita/i);
   });
 });
+
+describe('AuthPage — pending handoff', () => {
+  const LINE = "Dopo l'accesso ti riportiamo dove eri rimasto.";
+
+  afterEach(async () => {
+    const { clearPendingHandoff } = await import('../features/handoff/handoff');
+    clearPendingHandoff();
+  });
+
+  it('says where the customer goes after signing in when they came through ?handoff=', async () => {
+    const { captureHandoffFromUrl } = await import('../features/handoff/handoff');
+    window.history.replaceState({}, '', '/auth?handoff=promo-site');
+    captureHandoffFromUrl();
+    window.history.replaceState({}, '', '/');
+
+    const { container } = await renderAuthPage();
+    expect(container.textContent).toContain(LINE);
+  });
+
+  it('says nothing of the sort on a plain visit', async () => {
+    const { container } = await renderAuthPage();
+    expect(container.textContent).not.toContain(LINE);
+  });
+});
